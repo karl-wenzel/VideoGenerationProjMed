@@ -20,6 +20,7 @@ CHARACTER_REFERENCE_SHEET_FILENAME = "character_reference_sheet.png"
 LAST_RUN_PROMPTS_FILENAME = "last_run_prompts.json"
 USE_LLM_PROMPT: Final[bool] = True
 USE_CHARACTER_REFERENCE_SHEET: Final[bool] = True
+COMPOSITE_IMAGE: Final[bool] = True
 VERBOSE: Final[bool] = True
 
 
@@ -409,6 +410,15 @@ def generate_scene_images(
     Images are saved into output_dir and the returned list contains one entry
     per generated scene image.
     """
+    if COMPOSITE_IMAGE:
+        from composite_image_generator import generate_composite_scene_images
+
+        return generate_composite_scene_images(
+            json_path,
+            output_dir=output_dir,
+            size=size,
+        )
+
     story_spec = load_story_spec(json_path)
     characters = story_spec["characters"]
     scenes = story_spec["scenes"]

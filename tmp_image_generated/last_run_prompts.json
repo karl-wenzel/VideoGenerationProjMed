@@ -1,110 +1,154 @@
 [
   {
-    "api_call": "flux_character_reference_generation",
+    "api_call": "flux_composite_character_reference_generation",
     "character_index": 1,
     "character_name": "Lily",
-    "prompt": "Create a single-character reference image.\nShow the character clearly in a neutral full-body pose.\nUse a simple light background with no story scene action.\nThe character should be easy to reuse as a visual reference.\nDo not include text, letters, labels, captions, signs, or watermarks.\nTreat every character detail below as a fixed visual identity constraint.\n\nName: Lily\nAge: 8\nDescription: A curious girl.\nClothes: green skirt, bright yellow shirt\nHair Color: blond\nAccessories: book in hand\n\nStyle: warm children's storybook illustration, gentle natural light, soft painterly textures, expressive but friendly characters, coherent composition, suitable for a picture book."
+    "prompt": "Single full-body subject.\nNeutral standing pose.\nCentered composition.\nPlain solid light studio backdrop.\nClear silhouette and complete outfit.\nConsistent storybook illustration.\nAge: 8\nDescription: A curious girl.\nClothes: green skirt, bright yellow shirt\nHair Color: blond\nAccessories: book in hand\nStyle: warm children's storybook illustration, gentle natural light, soft painterly finish, expressive friendly subject, coherent composition, suitable for a picture book."
   },
   {
-    "api_call": "flux_character_reference_generation",
+    "api_call": "flux_composite_character_reference_generation",
     "character_index": 2,
     "character_name": "Benny",
-    "prompt": "Create a single-character reference image.\nShow the character clearly in a neutral full-body pose.\nUse a simple light background with no story scene action.\nThe character should be easy to reuse as a visual reference.\nDo not include text, letters, labels, captions, signs, or watermarks.\nTreat every character detail below as a fixed visual identity constraint.\n\nName: Benny\nAge: 6\nDescription: A cheerful little bear.\nClothes: brown fur\nHair Color: light brown\nAccessories: green scarf\n\nStyle: warm children's storybook illustration, gentle natural light, soft painterly textures, expressive but friendly characters, coherent composition, suitable for a picture book."
+    "prompt": "Single full-body subject.\nNeutral standing pose.\nCentered composition.\nPlain solid light studio backdrop.\nClear silhouette and complete outfit.\nConsistent storybook illustration.\nAge: 6\nDescription: A cheerful little bear.\nClothes: brown fur\nHair Color: light brown\nAccessories: green scarf\nStyle: warm children's storybook illustration, gentle natural light, soft painterly finish, expressive friendly subject, coherent composition, suitable for a picture book."
   },
   {
-    "api_call": "llm_prompt_builder",
+    "api_call": "composite_scene_layout_prompt_builder",
     "model": "openai-gpt-oss-120b",
     "messages": [
       {
         "role": "system",
-        "prompt": "You write compact image prompts for image generation. Your main job is enforcing character consistency. Include all fixed visual character attributes provided by the user. Keep the scene description brief and avoid unnecessary background, composition, mood, prop, or lighting details. Do not choose or mention an art style, medium, rendering technique, camera model, artist, genre label, or visual finish. Return only the prompt text, with no markdown, labels, or extra explanation."
+        "prompt": "You plan layered children's book image generation. Return only valid JSON. The JSON must contain background_prompt and characters. characters must be an array where each item has name, pose_prompt, placement_box, and layer_order. placement_box must contain x, y, width, and height as numbers from 0 to 1. Names are only for internal matching. background_prompt must describe only the setting. pose_prompt must describe action and body pose using visual traits, not proper names. Image prompts should use positive visual phrasing only."
       },
       {
         "role": "user",
-        "prompt": "Return a compact image prompt with exactly two short parts: 1. fixed character traits copied from the JSON, including clothing, hair, accessories, and any other visual identity fields; 2. one brief sentence for the scene action and setting. Prioritize character consistency over scenic detail.\n\nUse this JSON. Do not add style information.\n\n{\n  \"characters\": [\n    {\n      \"name\": \"Lily\",\n      \"age\": 8,\n      \"description\": \"A curious girl.\",\n      \"clothes\": \"green skirt, bright yellow shirt\",\n      \"hair_color\": \"blond\",\n      \"accessories\": \"book in hand\"\n    },\n    {\n      \"name\": \"Benny\",\n      \"age\": 6,\n      \"description\": \"A cheerful little bear.\",\n      \"clothes\": \"brown fur\",\n      \"hair_color\": \"light brown\",\n      \"accessories\": \"green scarf\"\n    }\n  ],\n  \"scene\": {\n    \"summary\": \"Lily meets Benny near a sparkling stream in the forest and they decide to spend the day together.\",\n    \"first_sentence\": \"Lily skipped along the forest path with her tiny red backpack bouncing behind her.\",\n    \"last_sentence\": \"By the time the sun climbed higher, Lily and Benny were already best friends.\"\n  }\n}"
+        "prompt": "Create a composite layout plan for this scene. Use compact image prompts. Make each character box large enough for a clear full-body subject.\n\n{\n  \"all_characters\": [\n    {\n      \"name\": \"Lily\",\n      \"age\": 8,\n      \"description\": \"A curious girl.\",\n      \"clothes\": \"green skirt, bright yellow shirt\",\n      \"hair_color\": \"blond\",\n      \"accessories\": \"book in hand\"\n    },\n    {\n      \"name\": \"Benny\",\n      \"age\": 6,\n      \"description\": \"A cheerful little bear.\",\n      \"clothes\": \"brown fur\",\n      \"hair_color\": \"light brown\",\n      \"accessories\": \"green scarf\"\n    }\n  ],\n  \"scene_characters\": [\n    {\n      \"name\": \"Lily\",\n      \"age\": 8,\n      \"description\": \"A curious girl.\",\n      \"clothes\": \"green skirt, bright yellow shirt\",\n      \"hair_color\": \"blond\",\n      \"accessories\": \"book in hand\"\n    },\n    {\n      \"name\": \"Benny\",\n      \"age\": 6,\n      \"description\": \"A cheerful little bear.\",\n      \"clothes\": \"brown fur\",\n      \"hair_color\": \"light brown\",\n      \"accessories\": \"green scarf\"\n    }\n  ],\n  \"scene\": {\n    \"summary\": \"Lily meets Benny near a sparkling stream in the forest and they decide to spend the day together.\",\n    \"first_sentence\": \"Lily skipped along the forest path with her tiny red backpack bouncing behind her.\",\n    \"last_sentence\": \"By the time the sun climbed higher, Lily and Benny were already best friends.\"\n  }\n}"
       }
     ]
   },
   {
-    "api_call": "qwen_scene_image_edit",
+    "api_call": "flux_composite_background_generation",
     "scene_index": 1,
-    "reference_image_path": "tmp_image_generated\\scene_references\\scene_001_reference.png",
-    "reference_character_names": [
-      "Lily",
-      "Benny"
-    ],
-    "prompt": "Use the uploaded character reference sheet only to preserve character appearance, proportions, clothing, and identity. Do not copy the reference sheet layout, do not draw panels, and do not add any text or labels. Generate a new scene matching the description below.\n\nLily: green skirt, bright yellow shirt, blond hair, book in hand; Benny: brown fur, light brown hair, green scarf. They meet beside a sparkling forest stream.\n\nStyle: warm children's storybook illustration, gentle natural light, soft painterly textures, expressive but friendly characters, coherent composition, suitable for a picture book."
+    "prompt": "sunlit forest clearing with a gentle sparkling stream winding through mossy banks, soft green foliage and dappled light filtering through leaves"
   },
   {
-    "api_call": "llm_prompt_builder",
+    "api_call": "qwen_composite_character_pose_generation",
+    "scene_index": 1,
+    "character_index": 1,
+    "character_name": "Lily",
+    "reference_image_path": "tmp_image_generated\\character_references\\character_001_lily.png",
+    "prompt": "Use the provided reference image as the identity guide.\nSingle full-body subject.\nPlain solid pure magenta #ff00ff studio backdrop.\nCentered isolated subject.\nClear silhouette.\nScene-specific body pose and expression:\nyoung girl standing on tiptoe, bright yellow shirt fluttering, green skirt swaying, blond hair tied in ponytail, holding an open book close to chest, smiling with eyes wide\nAge: 8\nDescription: A curious girl.\nClothes: green skirt, bright yellow shirt\nHair Color: blond\nAccessories: book in hand\nStyle: warm children's storybook illustration, gentle natural light, soft painterly finish, expressive friendly subject, coherent composition, suitable for a picture book."
+  },
+  {
+    "api_call": "qwen_composite_character_pose_generation",
+    "scene_index": 1,
+    "character_index": 2,
+    "character_name": "Benny",
+    "reference_image_path": "tmp_image_generated\\character_references\\character_002_benny.png",
+    "prompt": "Use the provided reference image as the identity guide.\nSingle full-body subject.\nPlain solid pure magenta #ff00ff studio backdrop.\nCentered isolated subject.\nClear silhouette.\nScene-specific body pose and expression:\nsmall friendly bear with light brown fur, wearing a green scarf, front paws lifted in a friendly wave, slight forward lean, smile on face, ears perked\nAge: 6\nDescription: A cheerful little bear.\nClothes: brown fur\nHair Color: light brown\nAccessories: green scarf\nStyle: warm children's storybook illustration, gentle natural light, soft painterly finish, expressive friendly subject, coherent composition, suitable for a picture book."
+  },
+  {
+    "api_call": "composite_scene_layout_prompt_builder",
     "model": "openai-gpt-oss-120b",
     "messages": [
       {
         "role": "system",
-        "prompt": "You write compact image prompts for image generation. Your main job is enforcing character consistency. Include all fixed visual character attributes provided by the user. Keep the scene description brief and avoid unnecessary background, composition, mood, prop, or lighting details. Do not choose or mention an art style, medium, rendering technique, camera model, artist, genre label, or visual finish. Return only the prompt text, with no markdown, labels, or extra explanation."
+        "prompt": "You plan layered children's book image generation. Return only valid JSON. The JSON must contain background_prompt and characters. characters must be an array where each item has name, pose_prompt, placement_box, and layer_order. placement_box must contain x, y, width, and height as numbers from 0 to 1. Names are only for internal matching. background_prompt must describe only the setting. pose_prompt must describe action and body pose using visual traits, not proper names. Image prompts should use positive visual phrasing only."
       },
       {
         "role": "user",
-        "prompt": "Return a compact image prompt with exactly two short parts: 1. fixed character traits copied from the JSON, including clothing, hair, accessories, and any other visual identity fields; 2. one brief sentence for the scene action and setting. Prioritize character consistency over scenic detail.\n\nUse this JSON. Do not add style information.\n\n{\n  \"characters\": [\n    {\n      \"name\": \"Lily\",\n      \"age\": 8,\n      \"description\": \"A curious girl.\",\n      \"clothes\": \"green skirt, bright yellow shirt\",\n      \"hair_color\": \"blond\",\n      \"accessories\": \"book in hand\"\n    },\n    {\n      \"name\": \"Benny\",\n      \"age\": 6,\n      \"description\": \"A cheerful little bear.\",\n      \"clothes\": \"brown fur\",\n      \"hair_color\": \"light brown\",\n      \"accessories\": \"green scarf\"\n    }\n  ],\n  \"scene\": {\n    \"summary\": \"The two friends discover that the birds have lost their nest after a windy storm.\",\n    \"first_sentence\": \"A loud chirping sound led Lily and Benny to a tall oak tree.\",\n    \"last_sentence\": \"Together, they promised the little birds they would help rebuild the nest.\"\n  }\n}"
+        "prompt": "Create a composite layout plan for this scene. Use compact image prompts. Make each character box large enough for a clear full-body subject.\n\n{\n  \"all_characters\": [\n    {\n      \"name\": \"Lily\",\n      \"age\": 8,\n      \"description\": \"A curious girl.\",\n      \"clothes\": \"green skirt, bright yellow shirt\",\n      \"hair_color\": \"blond\",\n      \"accessories\": \"book in hand\"\n    },\n    {\n      \"name\": \"Benny\",\n      \"age\": 6,\n      \"description\": \"A cheerful little bear.\",\n      \"clothes\": \"brown fur\",\n      \"hair_color\": \"light brown\",\n      \"accessories\": \"green scarf\"\n    }\n  ],\n  \"scene_characters\": [\n    {\n      \"name\": \"Lily\",\n      \"age\": 8,\n      \"description\": \"A curious girl.\",\n      \"clothes\": \"green skirt, bright yellow shirt\",\n      \"hair_color\": \"blond\",\n      \"accessories\": \"book in hand\"\n    },\n    {\n      \"name\": \"Benny\",\n      \"age\": 6,\n      \"description\": \"A cheerful little bear.\",\n      \"clothes\": \"brown fur\",\n      \"hair_color\": \"light brown\",\n      \"accessories\": \"green scarf\"\n    }\n  ],\n  \"scene\": {\n    \"summary\": \"The two friends discover that the birds have lost their nest after a windy storm.\",\n    \"first_sentence\": \"A loud chirping sound led Lily and Benny to a tall oak tree.\",\n    \"last_sentence\": \"Together, they promised the little birds they would help rebuild the nest.\"\n  }\n}"
       }
     ]
   },
   {
-    "api_call": "qwen_scene_image_edit",
+    "api_call": "flux_composite_background_generation",
     "scene_index": 2,
-    "reference_image_path": "tmp_image_generated\\scene_references\\scene_002_reference.png",
-    "reference_character_names": [
-      "Lily",
-      "Benny"
-    ],
-    "prompt": "Use the uploaded character reference sheet only to preserve character appearance, proportions, clothing, and identity. Do not copy the reference sheet layout, do not draw panels, and do not add any text or labels. Generate a new scene matching the description below.\n\nLily in a green skirt and bright yellow shirt, blond hair, holding a book; Benny with brown fur, light brown hair, wearing a green scarf. They stand beneath a tall oak tree listening to chirping birds after a storm.\n\nStyle: warm children's storybook illustration, gentle natural light, soft painterly textures, expressive but friendly characters, coherent composition, suitable for a picture book."
+    "prompt": "tall oak tree in a breezy forest clearing after a storm, scattered leaves, a broken nest on a branch, soft sunlight filtering through clouds"
   },
   {
-    "api_call": "llm_prompt_builder",
+    "api_call": "qwen_composite_character_pose_generation",
+    "scene_index": 2,
+    "character_index": 1,
+    "character_name": "Lily",
+    "reference_image_path": "tmp_image_generated\\character_references\\character_001_lily.png",
+    "prompt": "Use the provided reference image as the identity guide.\nSingle full-body subject.\nPlain solid pure magenta #ff00ff studio backdrop.\nCentered isolated subject.\nClear silhouette.\nScene-specific body pose and expression:\nfull-body standing girl, blond hair tied back, green skirt and bright yellow shirt, holding an open book in both hands, looking up at the tree\nAge: 8\nDescription: A curious girl.\nClothes: green skirt, bright yellow shirt\nHair Color: blond\nAccessories: book in hand\nStyle: warm children's storybook illustration, gentle natural light, soft painterly finish, expressive friendly subject, coherent composition, suitable for a picture book."
+  },
+  {
+    "api_call": "qwen_composite_character_pose_generation",
+    "scene_index": 2,
+    "character_index": 2,
+    "character_name": "Benny",
+    "reference_image_path": "tmp_image_generated\\character_references\\character_002_benny.png",
+    "prompt": "Use the provided reference image as the identity guide.\nSingle full-body subject.\nPlain solid pure magenta #ff00ff studio backdrop.\nCentered isolated subject.\nClear silhouette.\nScene-specific body pose and expression:\nfull-body upright bear, light brown fur, green scarf around neck, smiling, one paw raised as if offering help, facing the subject\nAge: 6\nDescription: A cheerful little bear.\nClothes: brown fur\nHair Color: light brown\nAccessories: green scarf\nStyle: warm children's storybook illustration, gentle natural light, soft painterly finish, expressive friendly subject, coherent composition, suitable for a picture book."
+  },
+  {
+    "api_call": "composite_scene_layout_prompt_builder",
     "model": "openai-gpt-oss-120b",
     "messages": [
       {
         "role": "system",
-        "prompt": "You write compact image prompts for image generation. Your main job is enforcing character consistency. Include all fixed visual character attributes provided by the user. Keep the scene description brief and avoid unnecessary background, composition, mood, prop, or lighting details. Do not choose or mention an art style, medium, rendering technique, camera model, artist, genre label, or visual finish. Return only the prompt text, with no markdown, labels, or extra explanation."
+        "prompt": "You plan layered children's book image generation. Return only valid JSON. The JSON must contain background_prompt and characters. characters must be an array where each item has name, pose_prompt, placement_box, and layer_order. placement_box must contain x, y, width, and height as numbers from 0 to 1. Names are only for internal matching. background_prompt must describe only the setting. pose_prompt must describe action and body pose using visual traits, not proper names. Image prompts should use positive visual phrasing only."
       },
       {
         "role": "user",
-        "prompt": "Return a compact image prompt with exactly two short parts: 1. fixed character traits copied from the JSON, including clothing, hair, accessories, and any other visual identity fields; 2. one brief sentence for the scene action and setting. Prioritize character consistency over scenic detail.\n\nUse this JSON. Do not add style information.\n\n{\n  \"characters\": [\n    {\n      \"name\": \"Lily\",\n      \"age\": 8,\n      \"description\": \"A curious girl.\",\n      \"clothes\": \"green skirt, bright yellow shirt\",\n      \"hair_color\": \"blond\",\n      \"accessories\": \"book in hand\"\n    },\n    {\n      \"name\": \"Benny\",\n      \"age\": 6,\n      \"description\": \"A cheerful little bear.\",\n      \"clothes\": \"brown fur\",\n      \"hair_color\": \"light brown\",\n      \"accessories\": \"green scarf\"\n    }\n  ],\n  \"scene\": {\n    \"summary\": \"Lily and Benny gather twigs, leaves, and soft moss to rebuild the birds’ nest before sunset.\",\n    \"first_sentence\": \"Benny carried sticks in his furry paws while Lily collected soft moss from the ground.\",\n    \"last_sentence\": \"The birds fluttered happily into their cozy new home.\"\n  }\n}"
+        "prompt": "Create a composite layout plan for this scene. Use compact image prompts. Make each character box large enough for a clear full-body subject.\n\n{\n  \"all_characters\": [\n    {\n      \"name\": \"Lily\",\n      \"age\": 8,\n      \"description\": \"A curious girl.\",\n      \"clothes\": \"green skirt, bright yellow shirt\",\n      \"hair_color\": \"blond\",\n      \"accessories\": \"book in hand\"\n    },\n    {\n      \"name\": \"Benny\",\n      \"age\": 6,\n      \"description\": \"A cheerful little bear.\",\n      \"clothes\": \"brown fur\",\n      \"hair_color\": \"light brown\",\n      \"accessories\": \"green scarf\"\n    }\n  ],\n  \"scene_characters\": [\n    {\n      \"name\": \"Lily\",\n      \"age\": 8,\n      \"description\": \"A curious girl.\",\n      \"clothes\": \"green skirt, bright yellow shirt\",\n      \"hair_color\": \"blond\",\n      \"accessories\": \"book in hand\"\n    },\n    {\n      \"name\": \"Benny\",\n      \"age\": 6,\n      \"description\": \"A cheerful little bear.\",\n      \"clothes\": \"brown fur\",\n      \"hair_color\": \"light brown\",\n      \"accessories\": \"green scarf\"\n    }\n  ],\n  \"scene\": {\n    \"summary\": \"Lily and Benny gather twigs, leaves, and soft moss to rebuild the birds’ nest before sunset.\",\n    \"first_sentence\": \"Benny carried sticks in his furry paws while Lily collected soft moss from the ground.\",\n    \"last_sentence\": \"The birds fluttered happily into their cozy new home.\"\n  }\n}"
       }
     ]
   },
   {
-    "api_call": "qwen_scene_image_edit",
+    "api_call": "flux_composite_background_generation",
     "scene_index": 3,
-    "reference_image_path": "tmp_image_generated\\scene_references\\scene_003_reference.png",
-    "reference_character_names": [
-      "Lily",
-      "Benny"
-    ],
-    "prompt": "Use the uploaded character reference sheet only to preserve character appearance, proportions, clothing, and identity. Do not copy the reference sheet layout, do not draw panels, and do not add any text or labels. Generate a new scene matching the description below.\n\nLily: green skirt, bright yellow shirt, blond hair, book in hand; Benny: brown fur, light brown hair, green scarf. Benny carries sticks while Lily gathers moss at sunset.\n\nStyle: warm children's storybook illustration, gentle natural light, soft painterly textures, expressive but friendly characters, coherent composition, suitable for a picture book."
+    "prompt": "sunset forest clearing with soft moss, scattered twigs and leaves, gentle golden light filtering through tall trees"
   },
   {
-    "api_call": "llm_prompt_builder",
+    "api_call": "qwen_composite_character_pose_generation",
+    "scene_index": 3,
+    "character_index": 1,
+    "character_name": "Lily",
+    "reference_image_path": "tmp_image_generated\\character_references\\character_001_lily.png",
+    "prompt": "Use the provided reference image as the identity guide.\nSingle full-body subject.\nPlain solid pure magenta #ff00ff studio backdrop.\nCentered isolated subject.\nClear silhouette.\nScene-specific body pose and expression:\nyoung girl with blond hair, wearing a green skirt and bright yellow shirt, holding an open book in both hands, standing with one foot slightly forward and eyes looking down at the ground\nAge: 8\nDescription: A curious girl.\nClothes: green skirt, bright yellow shirt\nHair Color: blond\nAccessories: book in hand\nStyle: warm children's storybook illustration, gentle natural light, soft painterly finish, expressive friendly subject, coherent composition, suitable for a picture book."
+  },
+  {
+    "api_call": "qwen_composite_character_pose_generation",
+    "scene_index": 3,
+    "character_index": 2,
+    "character_name": "Benny",
+    "reference_image_path": "tmp_image_generated\\character_references\\character_002_benny.png",
+    "prompt": "Use the provided reference image as the identity guide.\nSingle full-body subject.\nPlain solid pure magenta #ff00ff studio backdrop.\nCentered isolated subject.\nClear silhouette.\nScene-specific body pose and expression:\nsmall friendly bear with light brown fur, wearing a green scarf, carrying a bundle of sticks in both paws, leaning slightly forward with a gentle smile\nAge: 6\nDescription: A cheerful little bear.\nClothes: brown fur\nHair Color: light brown\nAccessories: green scarf\nStyle: warm children's storybook illustration, gentle natural light, soft painterly finish, expressive friendly subject, coherent composition, suitable for a picture book."
+  },
+  {
+    "api_call": "composite_scene_layout_prompt_builder",
     "model": "openai-gpt-oss-120b",
     "messages": [
       {
         "role": "system",
-        "prompt": "You write compact image prompts for image generation. Your main job is enforcing character consistency. Include all fixed visual character attributes provided by the user. Keep the scene description brief and avoid unnecessary background, composition, mood, prop, or lighting details. Do not choose or mention an art style, medium, rendering technique, camera model, artist, genre label, or visual finish. Return only the prompt text, with no markdown, labels, or extra explanation."
+        "prompt": "You plan layered children's book image generation. Return only valid JSON. The JSON must contain background_prompt and characters. characters must be an array where each item has name, pose_prompt, placement_box, and layer_order. placement_box must contain x, y, width, and height as numbers from 0 to 1. Names are only for internal matching. background_prompt must describe only the setting. pose_prompt must describe action and body pose using visual traits, not proper names. Image prompts should use positive visual phrasing only."
       },
       {
         "role": "user",
-        "prompt": "Return a compact image prompt with exactly two short parts: 1. fixed character traits copied from the JSON, including clothing, hair, accessories, and any other visual identity fields; 2. one brief sentence for the scene action and setting. Prioritize character consistency over scenic detail.\n\nUse this JSON. Do not add style information.\n\n{\n  \"characters\": [\n    {\n      \"name\": \"Lily\",\n      \"age\": 8,\n      \"description\": \"A curious girl.\",\n      \"clothes\": \"green skirt, bright yellow shirt\",\n      \"hair_color\": \"blond\",\n      \"accessories\": \"book in hand\"\n    },\n    {\n      \"name\": \"Benny\",\n      \"age\": 6,\n      \"description\": \"A cheerful little bear.\",\n      \"clothes\": \"brown fur\",\n      \"hair_color\": \"light brown\",\n      \"accessories\": \"green scarf\"\n    }\n  ],\n  \"scene\": {\n    \"summary\": \"The forest animals celebrate Lily and Benny’s kindness with a picnic under the stars.\",\n    \"first_sentence\": \"As evening arrived, glowing fireflies danced between the trees.\",\n    \"last_sentence\": \"Lily smiled as she realized that helping others made every adventure magical.\"\n  }\n}"
+        "prompt": "Create a composite layout plan for this scene. Use compact image prompts. Make each character box large enough for a clear full-body subject.\n\n{\n  \"all_characters\": [\n    {\n      \"name\": \"Lily\",\n      \"age\": 8,\n      \"description\": \"A curious girl.\",\n      \"clothes\": \"green skirt, bright yellow shirt\",\n      \"hair_color\": \"blond\",\n      \"accessories\": \"book in hand\"\n    },\n    {\n      \"name\": \"Benny\",\n      \"age\": 6,\n      \"description\": \"A cheerful little bear.\",\n      \"clothes\": \"brown fur\",\n      \"hair_color\": \"light brown\",\n      \"accessories\": \"green scarf\"\n    }\n  ],\n  \"scene_characters\": [\n    {\n      \"name\": \"Lily\",\n      \"age\": 8,\n      \"description\": \"A curious girl.\",\n      \"clothes\": \"green skirt, bright yellow shirt\",\n      \"hair_color\": \"blond\",\n      \"accessories\": \"book in hand\"\n    },\n    {\n      \"name\": \"Benny\",\n      \"age\": 6,\n      \"description\": \"A cheerful little bear.\",\n      \"clothes\": \"brown fur\",\n      \"hair_color\": \"light brown\",\n      \"accessories\": \"green scarf\"\n    }\n  ],\n  \"scene\": {\n    \"summary\": \"The forest animals celebrate Lily and Benny’s kindness with a picnic under the stars.\",\n    \"first_sentence\": \"As evening arrived, glowing fireflies danced between the trees.\",\n    \"last_sentence\": \"Lily smiled as she realized that helping others made every adventure magical.\"\n  }\n}"
       }
     ]
   },
   {
-    "api_call": "qwen_scene_image_edit",
+    "api_call": "flux_composite_background_generation",
     "scene_index": 4,
-    "reference_image_path": "tmp_image_generated\\scene_references\\scene_004_reference.png",
-    "reference_character_names": [
-      "Lily",
-      "Benny"
-    ],
-    "prompt": "Use the uploaded character reference sheet only to preserve character appearance, proportions, clothing, and identity. Do not copy the reference sheet layout, do not draw panels, and do not add any text or labels. Generate a new scene matching the description below.\n\nLily in a green skirt, bright yellow shirt, blond hair, holding a book; Benny with brown fur, light brown hair, green scarf. They enjoy a twilight forest picnic as fireflies flicker.\n\nStyle: warm children's storybook illustration, gentle natural light, soft painterly textures, expressive but friendly characters, coherent composition, suitable for a picture book."
+    "prompt": "soft moonlit forest clearing at twilight, gentle fireflies glowing, a cozy picnic blanket with basket, twinkling stars overhead, warm lantern light, lush green grass and tall trees"
+  },
+  {
+    "api_call": "qwen_composite_character_pose_generation",
+    "scene_index": 4,
+    "character_index": 1,
+    "character_name": "Lily",
+    "reference_image_path": "tmp_image_generated\\character_references\\character_001_lily.png",
+    "prompt": "Use the provided reference image as the identity guide.\nSingle full-body subject.\nPlain solid pure magenta #ff00ff studio backdrop.\nCentered isolated subject.\nClear silhouette.\nScene-specific body pose and expression:\nyoung girl with blond hair, bright yellow shirt and green skirt, holding an open book close to chest, eyes looking upward, standing with one foot slightly forward, arms relaxed at sides\nAge: 8\nDescription: A curious girl.\nClothes: green skirt, bright yellow shirt\nHair Color: blond\nAccessories: book in hand\nStyle: warm children's storybook illustration, gentle natural light, soft painterly finish, expressive friendly subject, coherent composition, suitable for a picture book."
+  },
+  {
+    "api_call": "qwen_composite_character_pose_generation",
+    "scene_index": 4,
+    "character_index": 2,
+    "character_name": "Benny",
+    "reference_image_path": "tmp_image_generated\\character_references\\character_002_benny.png",
+    "prompt": "Use the provided reference image as the identity guide.\nSingle full-body subject.\nPlain solid pure magenta #ff00ff studio backdrop.\nCentered isolated subject.\nClear silhouette.\nScene-specific body pose and expression:\nsmall cheerful bear with light brown fur, wearing a green scarf, standing on hind legs, paw raised in greeting, smiling face, slightly bent forward\nAge: 6\nDescription: A cheerful little bear.\nClothes: brown fur\nHair Color: light brown\nAccessories: green scarf\nStyle: warm children's storybook illustration, gentle natural light, soft painterly finish, expressive friendly subject, coherent composition, suitable for a picture book."
   }
 ]
