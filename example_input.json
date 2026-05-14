@@ -1,0 +1,36 @@
+{
+  "characters": [
+    {
+      "name": "Lily",
+      "age": 8,
+      "description": "A curious girl who loves exploring the forest and helping animals."
+    },
+    {
+      "name": "Benny",
+      "age": 6,
+      "description": "A cheerful little bear who enjoys collecting shiny stones and making new friends."
+    }
+  ],
+  "scenes": [
+    {
+      "summary": "Lily meets Benny near a sparkling stream in the forest and they decide to spend the day together.",
+      "first_sentence": "Lily skipped along the forest path with her tiny red backpack bouncing behind her.",
+      "last_sentence": "By the time the sun climbed higher, Lily and Benny were already best friends."
+    },
+    {
+      "summary": "The two friends discover that the birds have lost their nest after a windy storm.",
+      "first_sentence": "A loud chirping sound led Lily and Benny to a tall oak tree.",
+      "last_sentence": "Together, they promised the little birds they would help rebuild the nest."
+    },
+    {
+      "summary": "Lily and Benny gather twigs, leaves, and soft moss to rebuild the birds’ nest before sunset.",
+      "first_sentence": "Benny carried sticks in his furry paws while Lily collected soft moss from the ground.",
+      "last_sentence": "The birds fluttered happily into their cozy new home."
+    },
+    {
+      "summary": "The forest animals celebrate Lily and Benny’s kindness with a picnic under the stars.",
+      "first_sentence": "As evening arrived, glowing fireflies danced between the trees.",
+      "last_sentence": "Lily smiled as she realized that helping others made every adventure magical."
+    }
+  ]
+}
