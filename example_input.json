@@ -4,16 +4,18 @@
       "name": "Lily",
       "age": 8,
       "description": "A curious girl.",
-      "clothes": "green skirt, bright yellow shirt",
+      "clothes": "green kneelong skirt, bright yellow shirt",
       "hair_color": "blond",
-      "accessories": "book in hand"
+      "hair_style": "Hair in a braid",
+      "accessories": "red backpack, glasses"
     },
     {
       "name": "Benny",
       "age": 6,
       "description": "A cheerful little bear.",
-      "clothes": "brown fur",
+      "clothes": "brown, fluffy fur",
       "hair_color": "light brown",
+      "cheeks": "red",
       "accessories": "green scarf"
     }
   ],

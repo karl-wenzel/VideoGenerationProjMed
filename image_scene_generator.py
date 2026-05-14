@@ -21,6 +21,7 @@ LAST_RUN_PROMPTS_FILENAME = "last_run_prompts.json"
 USE_LLM_PROMPT: Final[bool] = True
 USE_CHARACTER_REFERENCE_SHEET: Final[bool] = True
 COMPOSITE_IMAGE: Final[bool] = True
+USE_QWEN_FOR_COMPOSITE: Final[bool] = True
 VERBOSE: Final[bool] = True
 
 

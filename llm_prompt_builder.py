@@ -57,11 +57,10 @@ def build_image_prompt_with_llm(
         "scene": scene,
     }
     output_contract = (
-        "Return a compact image prompt with exactly two short parts: "
-        "1. fixed character traits copied from the JSON, including clothing, "
+        "Return a compact image prompt with should include: "
+        "character traits from the JSON, including clothing, "
         "hair, accessories, and any other visual identity fields; "
-        "2. one brief sentence for the scene action and setting. "
-        "Prioritize character consistency over scenic detail."
+        "a brief description of the scene action and setting. "
     )
     messages = [
         {
@@ -189,13 +188,16 @@ def build_composite_scene_layout_with_llm(
                 "background_prompt must describe only the setting. pose_prompt "
                 "must describe a full-body isolated character pose that can be "
                 "composited into the background. Infer concrete posture from "
-                "the scene activity: sitting or kneeling for picnics and "
-                "ground-level activities, bending or reaching for collecting, "
-                "looking upward for tree or bird discoveries, and friendly "
-                "open posture for meeting scenes. Include facing direction, "
-                "gesture, expression, and ground contact. Use visual traits, "
-                "not proper names. Image prompts should use positive visual "
-                "phrasing only."
+                "the scene activity, including whether the body is standing, "
+                "sitting, kneeling, crouching, reaching, looking, pointing, "
+                "carrying, or resting. Include facing direction, gesture, "
+                "expression, limb positions, and held objects. Keep "
+                "pose_prompt limited to the isolated character body, clothing, "
+                "held objects, expression, and action. Put all location, "
+                "surface, scenery, lighting, weather, props that are not held, "
+                "and environment details in background_prompt instead. Use "
+                "visual traits, not proper names. Image prompts should use "
+                "positive visual phrasing only."
             ),
         },
         {
@@ -206,7 +208,9 @@ def build_composite_scene_layout_with_llm(
                 "enough for a clear full-body subject. The character pose "
                 "prompts will be rendered separately on a solid backdrop, so "
                 "they must be meaningful isolated body poses that visibly fit "
-                "the scene setting and action after compositing.\n\n"
+                "the scene action after compositing. Keep scene objects and "
+                "setting details in background_prompt, and keep pose_prompt as "
+                "a character-only layer prompt.\n\n"
                 f"{json.dumps(story_context, ensure_ascii=False, indent=2)}"
             ),
         },
