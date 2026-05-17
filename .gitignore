@@ -3,3 +3,4 @@ __pycache__/*
 tmp_image_generated/*
 .idea/
 .gitignore
+image_generation/__pycache__/
