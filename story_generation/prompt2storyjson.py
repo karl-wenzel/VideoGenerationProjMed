@@ -1,5 +1,6 @@
 import os
 import json
+from pathlib import Path
 from dotenv import load_dotenv
 from openai import OpenAI
 
@@ -112,4 +113,11 @@ response = client.chat.completions.create(
 content = response.choices[0].message.content
 story_data = json.loads(content)
 
-print(json.dumps(story_data, indent=2, ensure_ascii=False))
+base_dir = Path(__file__).resolve().parent
+output_path = base_dir.parent / "tmp" / "story.json"
+output_path.parent.mkdir(parents=True, exist_ok=True)
+
+with output_path.open("w", encoding="utf-8") as f:
+    json.dump(story_data, f, indent=2, ensure_ascii=False)
+
+print(f"Saved to: {output_path}")

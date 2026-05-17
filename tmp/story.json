@@ -1,44 +1,52 @@
 {
   "characters": [
     {
-      "name": "Lily",
-      "age": 8,
-      "description": "A curious girl.",
-      "clothes": "green kneelong skirt, bright yellow shirt",
-      "hair_color": "blond",
-      "hair_style": "Hair in a braid",
-      "accessories": "red backpack, glasses"
+      "name": "Mika",
+      "age": 5,
+      "description": "A shy little fox with soft brown fur and a fluffy tail, big curious eyes, and a tiny pink nose that twitches when she feels nervous.",
+      "clothes": "A simple leaf‑shaped scarf she wears around her neck.",
+      "hair_color": "brown",
+      "accessories": "none"
     },
     {
-      "name": "Benny",
-      "age": 6,
-      "description": "A cheerful little bear.",
-      "clothes": "brown, fluffy fur",
-      "hair_color": "light brown",
-      "cheeks": "red",
-      "accessories": "green scarf"
+      "name": "Lumi",
+      "age": 3,
+      "description": "A brave firefly with a bright golden glow, tiny delicate wings that sparkle, and a friendly smile that lights up the dark.",
+      "clothes": "none",
+      "hair_color": "none",
+      "accessories": "none"
     }
   ],
   "scenes": [
     {
-      "summary": "Lily meets Benny near a sparkling stream in the forest and they decide to spend the day together.",
-      "first_sentence": "Lily skipped along the forest path with her tiny red backpack bouncing behind her.",
-      "last_sentence": "By the time the sun climbed higher, Lily and Benny were already best friends."
+      "summary": "Mika the shy fox watches the dim moon from her forest clearing, feeling a little lonely.",
+      "first_sentence": "Under a sleepy sky, Mika peered up at the moon and saw only a faint silver whisper.",
+      "last_sentence": "She sighed, wishing the moon could shine brighter for everyone."
     },
     {
-      "summary": "The two friends discover that the birds have lost their nest after a windy storm.",
-      "first_sentence": "A loud chirping sound led Lily and Benny to a tall oak tree.",
-      "last_sentence": "Together, they promised the little birds they would help rebuild the nest."
+      "summary": "Lumi the firefly buzzes in, offering friendship and bright ideas.",
+      "first_sentence": "A gentle twinkle darted through the trees, and Lumi hovered in front of Mika, her light dancing like tiny stars.",
+      "last_sentence": "Together they promised to find a way to bring back the moon’s glow."
     },
     {
-      "summary": "Lily and Benny gather twigs, leaves, and soft moss to rebuild the birds' nest before sunset.",
-      "first_sentence": "Benny carried sticks in his furry paws while Lily collected soft moss from the ground.",
-      "last_sentence": "The birds fluttered happily into their cozy new home."
+      "summary": "The duo decides to travel to the Sky Tree, where moonlight is stored.",
+      "first_sentence": "“The Sky Tree holds the moon’s glow,” whispered Lumi, her glow growing steadier with excitement.",
+      "last_sentence": "Mika’s heart thumped with courage as they set off on the moonlit path."
     },
     {
-      "summary": "The forest animals celebrate Lily and Benny's kindness with a picnic under the stars.",
-      "first_sentence": "As evening arrived, glowing fireflies danced between the trees.",
-      "last_sentence": "Lily smiled as she realized that helping others made every adventure magical."
+      "summary": "Mika overcomes her shyness by sharing her tiny footprints as a trail for Lumi.",
+      "first_sentence": "Mika’s soft paws left gentle prints on the mossy ground, a secret map only she could read.",
+      "last_sentence": "Lumi followed the trail, lighting the way and cheering Mika’s quiet bravery."
+    },
+    {
+      "summary": "At the top of the Sky Tree, they find a glowing pearl of moonlight.",
+      "first_sentence": "High among the silver leaves, a shimmering pearl pulsed with sleepy light.",
+      "last_sentence": "Lumi lifted the pearl gently, and Mika felt a warm glow spread through her fur."
+    },
+    {
+      "summary": "They return the pearl to the moon, restoring its bright smile and giving Mika confidence.",
+      "first_sentence": "Back in the clearing, Mika placed the pearl on the moon’s smooth face, and it burst into a radiant smile.",
+      "last_sentence": "As the moon beamed brightly, Mika curled up content, knowing she had helped and felt brave at last."
     }
   ]
 }
