@@ -41,6 +41,7 @@ def generate_composite_scene_images(
     json_path: str | Path,
     *,
     output_dir: str | Path,
+    scene_output_dir: str | Path | None = None,
     size: str = "512x512",
 ) -> list[dict[str, Any]]:
     """Generate scenes by compositing posed character cutouts over backgrounds."""
@@ -81,7 +82,11 @@ def generate_composite_scene_images(
     pose_dir = output_path / SCENE_CHARACTER_POSE_OUTPUT_DIR_NAME
     cutout_dir = output_path / CHARACTER_CUTOUT_OUTPUT_DIR_NAME
     qwen_reference_dir = output_path / QWEN_COMPOSITE_REFERENCE_OUTPUT_DIR_NAME
-    scene_dir = output_path / "scenes"
+    scene_dir = (
+        Path(scene_output_dir)
+        if scene_output_dir is not None
+        else output_path / "scenes"
+    )
 
     for directory_path in [
         character_reference_dir,

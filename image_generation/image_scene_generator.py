@@ -7,8 +7,10 @@ from typing import Any, Final
 import requests
 
 
-DEFAULT_INPUT_PATH = Path(__file__).with_name("example_input.json")
-DEFAULT_OUTPUT_DIR = "tmp_image_generated"
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+DEFAULT_INPUT_PATH = PROJECT_ROOT / "tmp" / "story.json"
+DEFAULT_OUTPUT_DIR = PROJECT_ROOT / "tmp_image_generated"
+DEFAULT_SCENE_OUTPUT_DIR = PROJECT_ROOT / "tmp" / "scene_images"
 IMAGE_GENERATION_URL = "https://saia.gwdg.de/v1/images/generations"
 IMAGE_EDIT_URL = "https://saia.gwdg.de/v1/images/edits/"
 FLUX_MODEL = "flux"
@@ -412,6 +414,7 @@ def generate_scene_images(
     json_path: str | Path = DEFAULT_INPUT_PATH,
     *,
     output_dir: str | Path = DEFAULT_OUTPUT_DIR,
+    scene_output_dir: str | Path = DEFAULT_SCENE_OUTPUT_DIR,
     size: str = "512x512",
 ) -> list[dict[str, Any]]:
     """
@@ -429,6 +432,7 @@ def generate_scene_images(
         return generate_composite_scene_images(
             json_path,
             output_dir=output_dir,
+            scene_output_dir=scene_output_dir,
             size=size,
         )
 
@@ -439,7 +443,7 @@ def generate_scene_images(
     output_path = Path(output_dir)
     output_path.mkdir(parents=True, exist_ok=True)
     character_output_path = output_path / CHARACTER_OUTPUT_DIR_NAME
-    scene_output_path = output_path / SCENE_OUTPUT_DIR_NAME
+    scene_output_path = Path(scene_output_dir)
     scene_reference_output_path = output_path / SCENE_REFERENCE_OUTPUT_DIR_NAME
     scene_output_path.mkdir(parents=True, exist_ok=True)
     prompt_log: list[dict[str, Any]] = []
