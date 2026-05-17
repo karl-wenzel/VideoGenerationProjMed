@@ -18,6 +18,7 @@ from .image_generation_client import (
 )
 from .llm_prompt_builder import build_composite_scene_layout_with_llm
 from .prompt_config import (
+    COMPOSITE_CHARACTER_LAYER_STYLE_PROMPT,
     COMPOSITE_CHARACTER_IDENTITY_SUMMARY_PREFIX,
     COMPOSITE_CHARACTER_REFERENCE_PROMPT_LINES,
     COMPOSITE_DEFAULT_SCENE_DESCRIPTION,
@@ -27,8 +28,10 @@ from .prompt_config import (
     QWEN_COMPOSITE_CHARACTER_POSE_PROMPT_LINES,
     QWEN_COMPOSITE_SCENE_ACTION_SECTION_LABEL,
     QWEN_COMPOSITE_SCENE_ENVIRONMENT_SECTION_LABEL,
+    QWEN_COMPOSITE_SCENE_CHARACTER_MASK_EROSION_PIXELS,
     QWEN_COMPOSITE_SCENE_REFERENCE_INSTRUCTION_LINES,
     QWEN_COMPOSITE_SCENE_STYLE_PROMPT,
+    USE_QWEN_COMPOSITE_SCENE_CHARACTER_MASK,
 )
 
 
@@ -36,9 +39,12 @@ CHARACTER_REFERENCE_OUTPUT_DIR_NAME = "character_references"
 SCENE_CHARACTER_POSE_OUTPUT_DIR_NAME = "scene_character_poses"
 CHARACTER_CUTOUT_OUTPUT_DIR_NAME = "character_cutouts"
 QWEN_COMPOSITE_REFERENCE_OUTPUT_DIR_NAME = "qwen_composite_references"
+QWEN_COMPOSITE_MASK_OUTPUT_DIR_NAME = "qwen_composite_masks"
 COMPOSITE_SCENE_SIZE = "1344x768"
 COMPOSITE_STYLE_PROMPT = COMPOSITE_IMAGE_STYLE_PROMPT
-QWEN_COMPOSITE_REFERENCE_BACKGROUND_RGB = (128, 128, 128)
+COMPOSITE_CHARACTER_STYLE_PROMPT = COMPOSITE_CHARACTER_LAYER_STYLE_PROMPT
+QWEN_COMPOSITE_REFERENCE_BACKGROUND_RGB = (255, 0, 255)
+QWEN_COMPOSITE_MASK_BACKGROUND_TOLERANCE = 5
 KEY_COLOR_TOLERANCE = 55
 MASK_FEATHER_RADIUS = 1.2
 
@@ -61,6 +67,7 @@ def generate_composite_scene_images(
     pose_dir = output_path / SCENE_CHARACTER_POSE_OUTPUT_DIR_NAME
     cutout_dir = output_path / CHARACTER_CUTOUT_OUTPUT_DIR_NAME
     qwen_reference_dir = output_path / QWEN_COMPOSITE_REFERENCE_OUTPUT_DIR_NAME
+    qwen_mask_dir = output_path / QWEN_COMPOSITE_MASK_OUTPUT_DIR_NAME
     scene_dir = (
         Path(scene_output_dir)
         if scene_output_dir is not None
@@ -72,6 +79,7 @@ def generate_composite_scene_images(
         pose_dir,
         cutout_dir,
         qwen_reference_dir,
+        qwen_mask_dir,
         scene_dir,
     ]:
         directory_path.mkdir(parents=True, exist_ok=True)
@@ -179,6 +187,17 @@ def generate_composite_scene_images(
                 qwen_reference_path,
                 COMPOSITE_SCENE_SIZE,
             )
+            qwen_mask_path: Path | None = None
+            if USE_QWEN_COMPOSITE_SCENE_CHARACTER_MASK:
+                qwen_mask_path = (
+                    qwen_mask_dir
+                    / f"scene_{scene_index:03d}_character_preservation_mask.png"
+                )
+                create_qwen_character_preservation_mask(
+                    qwen_reference_path,
+                    qwen_mask_path,
+                )
+
             qwen_scene_prompt = build_qwen_composite_scene_prompt(
                 layout,
                 scene,
@@ -189,6 +208,8 @@ def generate_composite_scene_images(
                     "api_call": "qwen_composite_scene_generation",
                     "scene_index": scene_index,
                     "reference_image_path": str(qwen_reference_path),
+                    "mask_image_path": str(qwen_mask_path) if qwen_mask_path else None,
+                    "uses_character_mask": qwen_mask_path is not None,
                     "prompt": qwen_scene_prompt,
                 }
             )
@@ -196,6 +217,7 @@ def generate_composite_scene_images(
                 qwen_scene_prompt,
                 qwen_reference_path,
                 final_path,
+                mask_image_path=qwen_mask_path,
             )
 
             generated_images.append(
@@ -203,6 +225,7 @@ def generate_composite_scene_images(
                     "scene_index": scene_index,
                     "output_path": str(final_path),
                     "qwen_reference_path": str(qwen_reference_path),
+                    "qwen_mask_path": str(qwen_mask_path) if qwen_mask_path else None,
                     "qwen_scene_prompt": qwen_scene_prompt,
                     "character_layers": character_layers,
                     "layout": layout,
@@ -273,7 +296,7 @@ def build_character_reference_prompt(
     prompt_parts = [
         *COMPOSITE_CHARACTER_REFERENCE_PROMPT_LINES,
         *details,
-        COMPOSITE_STYLE_PROMPT,
+        COMPOSITE_CHARACTER_STYLE_PROMPT,
     ]
     return "\n".join(prompt_parts)
 
@@ -482,7 +505,7 @@ def build_pose_prompt(
         *QWEN_COMPOSITE_CHARACTER_POSE_PROMPT_LINES,
         append_pose_clarity(pose_action),
         *details,
-        COMPOSITE_STYLE_PROMPT,
+        COMPOSITE_CHARACTER_STYLE_PROMPT,
     ]
     return "\n".join(prompt_parts)
 
@@ -772,6 +795,51 @@ def create_character_layout_reference(
     resolved_output_path = Path(output_path)
     resolved_output_path.parent.mkdir(parents=True, exist_ok=True)
     canvas.convert("RGB").save(resolved_output_path)
+    return resolved_output_path
+
+
+def create_qwen_character_preservation_mask(
+    reference_image_path: str | Path,
+    output_path: str | Path,
+    *,
+    background_rgb: tuple[int, int, int] = QWEN_COMPOSITE_REFERENCE_BACKGROUND_RGB,
+    tolerance: int = QWEN_COMPOSITE_MASK_BACKGROUND_TOLERANCE,
+    erosion_pixels: int = QWEN_COMPOSITE_SCENE_CHARACTER_MASK_EROSION_PIXELS,
+) -> Path:
+    """
+    Create an OpenAI-compatible edit mask for Qwen final scene compositing.
+
+    Transparent pixels mark editable magenta background. Opaque pixels mark
+    character cores that Qwen should preserve. A small erosion leaves character
+    edges editable so Qwen can blend lighting, shadows, and ground contact.
+    """
+    with Image.open(reference_image_path) as reference_image:
+        source_image = reference_image.convert("RGBA")
+
+    alpha_mask = Image.new("L", source_image.size, 255)
+    source_pixels = source_image.load()
+    alpha_pixels = alpha_mask.load()
+
+    for y in range(source_image.height):
+        for x in range(source_image.width):
+            red, green, blue, _ = source_pixels[x, y]
+            if pixel_matches_key(
+                (red, green, blue),
+                background_rgb,
+                tolerance,
+            ):
+                alpha_pixels[x, y] = 0
+
+    if erosion_pixels > 0:
+        filter_size = erosion_pixels * 2 + 1
+        alpha_mask = alpha_mask.filter(ImageFilter.MinFilter(filter_size))
+
+    mask_image = Image.new("RGBA", source_image.size, (0, 0, 0, 0))
+    mask_image.putalpha(alpha_mask)
+
+    resolved_output_path = Path(output_path)
+    resolved_output_path.parent.mkdir(parents=True, exist_ok=True)
+    mask_image.save(resolved_output_path)
     return resolved_output_path
 
 

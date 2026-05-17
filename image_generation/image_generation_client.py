@@ -1,4 +1,5 @@
 import base64
+from contextlib import ExitStack
 import json
 import os
 from pathlib import Path
@@ -181,6 +182,7 @@ def generate_scene_image_with_qwen(
     input_image_path: str | Path,
     output_path: str | Path,
     *,
+    mask_image_path: str | Path | None = None,
     api_key: str | None = None,
     timeout_seconds: int = 180,
 ) -> None:
@@ -203,16 +205,28 @@ def generate_scene_image_with_qwen(
         print("role: image_generation")
         print(f"prompt: {prompt}")
         print(f"input_image: {input_image_path}")
+        if mask_image_path is not None:
+            print(f"mask_image: {mask_image_path}")
 
     files: dict[str, Any] = {
         "prompt": (None, prompt),
     }
-    with Path(input_image_path).open("rb") as image_file:
+    with ExitStack() as stack:
+        image_file = stack.enter_context(Path(input_image_path).open("rb"))
         files["image"] = (
             Path(input_image_path).name,
             image_file,
             "image/png",
         )
+        if mask_image_path is not None:
+            mask_path = Path(mask_image_path)
+            mask_file = stack.enter_context(mask_path.open("rb"))
+            files["mask"] = (
+                mask_path.name,
+                mask_file,
+                "image/png",
+            )
+
         response = requests.post(
             IMAGE_EDIT_URL,
             headers=headers,

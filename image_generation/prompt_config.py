@@ -1,15 +1,24 @@
 """Central prompt configuration for image generation workflows."""
 
+USE_QWEN_COMPOSITE_SCENE_CHARACTER_MASK = True
+QWEN_COMPOSITE_SCENE_CHARACTER_MASK_EROSION_PIXELS = 3
+
 COMPOSITE_IMAGE_STYLE_PROMPT = (
     "Style: warm children's illustration, vivid colors, gentle natural light, "
-    "soft painterly textures, detailed background, brushstrokes, expressive but friendly characters, coherent "
-    "composition. Painted, happy style."
+    "soft painterly textures, brushstrokes, expressive but friendly subjects, "
+    "coherent composition. Painted, happy style."
+)
+
+COMPOSITE_CHARACTER_LAYER_STYLE_PROMPT = (
+    "Style: warm children's illustration, vivid colors, clean character "
+    "silhouette, soft painterly textures, expressive but friendly character, "
+    "coherent character design. Painted, happy style."
 )
 
 QWEN_COMPOSITE_SCENE_STYLE_PROMPT = (
     "Style: warm children's illustration, vivid colors, gentle natural light, "
-    "soft painterly textures, detailed storybook environment, brushstrokes, "
-    "coherent composition. Painted, happy style."
+    "soft painterly textures, detailed background, "
+    "brushstrokes, coherent composition. Painted, happy style."
 )
 
 LLM_COMPOSITE_LAYOUT_SYSTEM_MESSAGE = (
@@ -53,31 +62,35 @@ LLM_COMPOSITE_LAYOUT_REPAIR_USER_MESSAGE = (
 )
 
 COMPOSITE_CHARACTER_REFERENCE_PROMPT_LINES = (
+    "Create a new character from scratch using the text description.",
     "Single full-body subject.",
     "Neutral standing pose.",
     "Centered composition.",
-    "Plain solid light studio backdrop.",
+    "Uniform flat pure magenta #ff00ff studio backdrop from edge to edge.",
     "Clear silhouette and complete outfit.",
     "Consistent storybook illustration.",
+    "No scenery, no ground patch, no floor contact surface, no cast shadow.",
 )
 
 QWEN_COMPOSITE_SCENE_REFERENCE_INSTRUCTION_LINES = (
     "The uploaded image is a character layout reference.",
-    "Use exactly the visible uploaded characters as the complete character cast.",
-    "Only replace the flat neutral grey canvas with the requested environment.",
+    "Treat the visible uploaded characters as fixed foreground subjects.",
+    "Use exactly those visible uploaded characters as the complete character cast.",
+    "Only replace the flat pure magenta #ff00ff canvas with the requested environment.",
     "Keep the exact number of visible characters from the uploaded image.",
     (
         "Preserve their appearance, clothing, pose, scale, and relative "
         "positions from the uploaded image."
     ),
     (
-        "Do not create, redraw, duplicate, mirror, move, resize, hide, or "
-        "remove any visible character."
+        "Do not create, duplicate, mirror, move, resize, hide, or remove any "
+        "visible character."
     ),
     (
-        "Paint scenery, lighting, shadows, and ground contact around the "
-        "existing character pixels only."
+        "Blend the environment around the existing character edges with "
+        "natural contact shadows, local lighting, and ground or air contact."
     ),
+    "Do not ignore the characters; compose the scene around their exact positions.",
     (
         "The final image must contain no extra copies, reflections, "
         "silhouettes, or background versions of the visible characters."
@@ -98,6 +111,8 @@ COMPOSITE_POSE_CLARITY_PROMPT_LINES = (
     "Render a character-only studio layer.",
     "Show the scene activity through body posture, gesture, and expression.",
     "Keep the pose as an isolated subject layer for later compositing.",
+    "Do not render scenery, landscape, ground, floor, sky, weather, lighting effects, shadows, or environmental props.",
+    "Only include objects physically held or worn by the character.",
 )
 
 COMPOSITE_DEFAULT_SCENE_DESCRIPTION = (
@@ -111,5 +126,7 @@ QWEN_COMPOSITE_CHARACTER_POSE_PROMPT_LINES = (
     "Centered isolated subject.",
     "Clear silhouette.",
     "Character-only layer.",
+    "No background objects, no scenery, no ground patch, no floor contact surface, no cast shadow.",
+    "No environmental lighting or atmosphere; keep plain studio lighting.",
     "Scene-specific body pose and expression:",
 )
