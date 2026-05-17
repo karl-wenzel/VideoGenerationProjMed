@@ -7,7 +7,7 @@ from typing import Any, Final
 import requests
 
 
-DEFAULT_INPUT_PATH = "example_input.json"
+DEFAULT_INPUT_PATH = Path(__file__).with_name("example_input.json")
 DEFAULT_OUTPUT_DIR = "tmp_image_generated"
 IMAGE_GENERATION_URL = "https://saia.gwdg.de/v1/images/generations"
 IMAGE_EDIT_URL = "https://saia.gwdg.de/v1/images/edits/"
@@ -82,7 +82,10 @@ def build_scene_prompt(
         )
 
     if USE_LLM_PROMPT:
-        from llm_prompt_builder import build_image_prompt_with_llm
+        try:
+            from .llm_prompt_builder import build_image_prompt_with_llm
+        except ImportError:
+            from llm_prompt_builder import build_image_prompt_with_llm
 
         scene_prompt = build_image_prompt_with_llm(
             characters,
@@ -101,7 +104,10 @@ def build_scene_prompt(
         details = "; ".join(format_character_details(character))
         character_lines.append(f"- {name}: {details}")
 
-    from llm_prompt_builder import STYLE_PROMPT
+    try:
+        from .llm_prompt_builder import STYLE_PROMPT
+    except ImportError:
+        from llm_prompt_builder import STYLE_PROMPT
 
     visual_description = "\n".join(
         [
@@ -146,7 +152,10 @@ def format_character_details(character: dict[str, Any]) -> list[str]:
 
 def build_character_reference_prompt(character: dict[str, Any]) -> str:
     """Create a FLUX prompt for one reusable character reference image."""
-    from llm_prompt_builder import STYLE_PROMPT
+    try:
+        from .llm_prompt_builder import STYLE_PROMPT
+    except ImportError:
+        from llm_prompt_builder import STYLE_PROMPT
 
     character_details = format_character_details(character)
     return "\n".join(
@@ -412,7 +421,10 @@ def generate_scene_images(
     per generated scene image.
     """
     if COMPOSITE_IMAGE:
-        from composite_image_generator import generate_composite_scene_images
+        try:
+            from .composite_image_generator import generate_composite_scene_images
+        except ImportError:
+            from composite_image_generator import generate_composite_scene_images
 
         return generate_composite_scene_images(
             json_path,

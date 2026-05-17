@@ -44,18 +44,32 @@ def generate_composite_scene_images(
     size: str = "512x512",
 ) -> list[dict[str, Any]]:
     """Generate scenes by compositing posed character cutouts over backgrounds."""
-    from image_generation.image_scene_generator import (
-        FLUX_MODEL,
-        USE_QWEN_FOR_COMPOSITE,
-        VERBOSE,
-        b64_to_image,
-        generate_image_b64,
-        generate_scene_image_with_qwen,
-        load_story_spec,
-        sanitize_filename,
-        save_prompt_log,
-        select_character_images_for_scene,
-    )
+    try:
+        from .image_scene_generator import (
+            FLUX_MODEL,
+            USE_QWEN_FOR_COMPOSITE,
+            VERBOSE,
+            b64_to_image,
+            generate_image_b64,
+            generate_scene_image_with_qwen,
+            load_story_spec,
+            sanitize_filename,
+            save_prompt_log,
+            select_character_images_for_scene,
+        )
+    except ImportError:
+        from image_scene_generator import (
+            FLUX_MODEL,
+            USE_QWEN_FOR_COMPOSITE,
+            VERBOSE,
+            b64_to_image,
+            generate_image_b64,
+            generate_scene_image_with_qwen,
+            load_story_spec,
+            sanitize_filename,
+            save_prompt_log,
+            select_character_images_for_scene,
+        )
 
     story_spec = load_story_spec(json_path)
     characters = story_spec["characters"]
@@ -269,12 +283,20 @@ def generate_composite_character_references(
     prompt_log: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
     """Generate one unnamed, single-subject reference image per character."""
-    from image_generation.image_scene_generator import (
-        FLUX_MODEL,
-        b64_to_image,
-        generate_image_b64,
-        sanitize_filename,
-    )
+    try:
+        from .image_scene_generator import (
+            FLUX_MODEL,
+            b64_to_image,
+            generate_image_b64,
+            sanitize_filename,
+        )
+    except ImportError:
+        from image_scene_generator import (
+            FLUX_MODEL,
+            b64_to_image,
+            generate_image_b64,
+            sanitize_filename,
+        )
 
     generated_references: list[dict[str, Any]] = []
     output_path = Path(output_dir)
@@ -411,7 +433,10 @@ def build_scene_layout(
     verbose: bool,
 ) -> dict[str, Any]:
     """Return an LLM layout, falling back to deterministic prompts and boxes."""
-    from image_generation.llm_prompt_builder import build_composite_scene_layout_with_llm
+    try:
+        from .llm_prompt_builder import build_composite_scene_layout_with_llm
+    except ImportError:
+        from llm_prompt_builder import build_composite_scene_layout_with_llm
 
     scene_characters = [
         character_reference["character"]
