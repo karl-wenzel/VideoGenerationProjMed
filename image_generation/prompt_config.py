@@ -6,6 +6,12 @@ COMPOSITE_IMAGE_STYLE_PROMPT = (
     "composition. Painted, happy style."
 )
 
+QWEN_COMPOSITE_SCENE_STYLE_PROMPT = (
+    "Style: warm children's illustration, vivid colors, gentle natural light, "
+    "soft painterly textures, detailed storybook environment, brushstrokes, "
+    "coherent composition. Painted, happy style."
+)
+
 LLM_COMPOSITE_LAYOUT_SYSTEM_MESSAGE = (
     "You plan layered children's book image generation. Return only "
     "valid JSON. The JSON must contain background_prompt and "
@@ -58,22 +64,26 @@ COMPOSITE_CHARACTER_REFERENCE_PROMPT_LINES = (
 QWEN_COMPOSITE_SCENE_REFERENCE_INSTRUCTION_LINES = (
     "The uploaded image is a character layout reference.",
     "Use exactly the visible uploaded characters as the complete character cast.",
+    "Only replace the flat neutral grey canvas with the requested environment.",
+    "Keep the exact number of visible characters from the uploaded image.",
     (
         "Preserve their appearance, clothing, pose, scale, and relative "
         "positions from the uploaded image."
     ),
     (
-        "Treat the flat neutral grey canvas as a replaceable layout field "
-        "for the environment."
+        "Do not create, redraw, duplicate, mirror, move, resize, hide, or "
+        "remove any visible character."
     ),
     (
-        "Fill the layout field with the environment below, "
-        "integrating the characters with natural ground contact, "
-        "lighting, shadows, and depth."
+        "Paint scenery, lighting, shadows, and ground contact around the "
+        "existing character pixels only."
+    ),
+    (
+        "The final image must contain no extra copies, reflections, "
+        "silhouettes, or background versions of the visible characters."
     ),
 )
 
-QWEN_COMPOSITE_SCENE_CHARACTER_IDENTITY_SECTION_LABEL = "Character identity guide:"
 QWEN_COMPOSITE_SCENE_ACTION_SECTION_LABEL = "Scene action cue:"
 QWEN_COMPOSITE_SCENE_ENVIRONMENT_SECTION_LABEL = "Environment to create:"
 

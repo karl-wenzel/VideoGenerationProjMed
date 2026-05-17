@@ -26,9 +26,9 @@ from .prompt_config import (
     COMPOSITE_POSE_CLARITY_PROMPT_LINES,
     QWEN_COMPOSITE_CHARACTER_POSE_PROMPT_LINES,
     QWEN_COMPOSITE_SCENE_ACTION_SECTION_LABEL,
-    QWEN_COMPOSITE_SCENE_CHARACTER_IDENTITY_SECTION_LABEL,
     QWEN_COMPOSITE_SCENE_ENVIRONMENT_SECTION_LABEL,
     QWEN_COMPOSITE_SCENE_REFERENCE_INSTRUCTION_LINES,
+    QWEN_COMPOSITE_SCENE_STYLE_PROMPT,
 )
 
 
@@ -284,7 +284,9 @@ def build_qwen_composite_scene_prompt(
     scene_character_references: list[dict[str, Any]],
 ) -> str:
     """Build the final Qwen prompt for the Qwen-assisted composite route."""
-    background_prompt = ensure_style_prompt(str(layout["background_prompt"]))
+    background_prompt = ensure_scene_environment_style_prompt(
+        str(layout["background_prompt"])
+    )
     scene_context = collect_scene_description(scene)
     character_summary = build_character_identity_summary(
         scene_character_references,
@@ -295,11 +297,7 @@ def build_qwen_composite_scene_prompt(
     return "\n\n".join(
         [
             reference_instruction,
-            (
-                f"{QWEN_COMPOSITE_SCENE_CHARACTER_IDENTITY_SECTION_LABEL}\n"
-                f"{character_summary}"
-            ),
-            f"{QWEN_COMPOSITE_SCENE_ACTION_SECTION_LABEL}\n{scene_context}",
+            #f"{QWEN_COMPOSITE_SCENE_ACTION_SECTION_LABEL}\n{scene_context}",
             (
                 f"{QWEN_COMPOSITE_SCENE_ENVIRONMENT_SECTION_LABEL}\n"
                 f"{background_prompt}"
@@ -429,10 +427,20 @@ def build_fallback_background_prompt(scene: dict[str, Any]) -> str:
 
 def ensure_style_prompt(prompt: str) -> str:
     """Append the composite style prompt once."""
-    if COMPOSITE_STYLE_PROMPT in prompt:
+    return ensure_prompt_suffix(prompt, COMPOSITE_STYLE_PROMPT)
+
+
+def ensure_scene_environment_style_prompt(prompt: str) -> str:
+    """Append the final scene environment style prompt once."""
+    return ensure_prompt_suffix(prompt, QWEN_COMPOSITE_SCENE_STYLE_PROMPT)
+
+
+def ensure_prompt_suffix(prompt: str, suffix: str) -> str:
+    """Append a prompt suffix once."""
+    if suffix in prompt:
         return prompt
 
-    return f"{prompt.strip()}\n{COMPOSITE_STYLE_PROMPT}"
+    return f"{prompt.strip()}\n{suffix}"
 
 
 def append_pose_clarity(prompt: str) -> str:
