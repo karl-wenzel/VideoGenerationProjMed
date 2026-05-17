@@ -44,7 +44,7 @@ def generate_composite_scene_images(
     size: str = "512x512",
 ) -> list[dict[str, Any]]:
     """Generate scenes by compositing posed character cutouts over backgrounds."""
-    from image_scene_generator import (
+    from image_generation.image_scene_generator import (
         FLUX_MODEL,
         USE_QWEN_FOR_COMPOSITE,
         VERBOSE,
@@ -269,7 +269,7 @@ def generate_composite_character_references(
     prompt_log: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
     """Generate one unnamed, single-subject reference image per character."""
-    from image_scene_generator import (
+    from image_generation.image_scene_generator import (
         FLUX_MODEL,
         b64_to_image,
         generate_image_b64,
@@ -411,7 +411,7 @@ def build_scene_layout(
     verbose: bool,
 ) -> dict[str, Any]:
     """Return an LLM layout, falling back to deterministic prompts and boxes."""
-    from llm_prompt_builder import build_composite_scene_layout_with_llm
+    from image_generation.llm_prompt_builder import build_composite_scene_layout_with_llm
 
     scene_characters = [
         character_reference["character"]
