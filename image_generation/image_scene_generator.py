@@ -9,7 +9,7 @@ import requests
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_INPUT_PATH = PROJECT_ROOT / "tmp" / "story.json"
-DEFAULT_OUTPUT_DIR = PROJECT_ROOT / "tmp_image_generated"
+DEFAULT_OUTPUT_DIR = PROJECT_ROOT / "tmp/tmp_image_generated"
 DEFAULT_SCENE_OUTPUT_DIR = PROJECT_ROOT / "tmp" / "scene_images"
 IMAGE_GENERATION_URL = "https://saia.gwdg.de/v1/images/generations"
 IMAGE_EDIT_URL = "https://saia.gwdg.de/v1/images/edits/"
