@@ -1,38 +1,9 @@
 """Central prompt configuration for image generation workflows."""
 
-SCENE_IMAGE_STYLE_PROMPT = (
-    "Style: warm children's illustration, vivid colors, gentle natural light, "
-    "soft painterly textures, detailed background, brushstrokes, expressive but friendly characters, coherent "
-    "composition. Painted, happy style."
-)
-
 COMPOSITE_IMAGE_STYLE_PROMPT = (
     "Style: warm children's illustration, vivid colors, gentle natural light, "
     "soft painterly textures, detailed background, brushstrokes, expressive but friendly characters, coherent "
     "composition. Painted, happy style."
-)
-
-LLM_SCENE_IMAGE_PROMPT_OUTPUT_CONTRACT = (
-    "Return a compact image prompt with should include: "
-    "character traits from the JSON, including clothing, "
-    "hair, accessories, and any other visual identity fields; "
-    "a brief description of the scene action and setting. "
-)
-
-LLM_SCENE_IMAGE_PROMPT_SYSTEM_MESSAGE = (
-    "You write compact image prompts for image generation. "
-    "Your main job is enforcing character consistency. Include "
-    "all fixed visual character attributes provided by the user. "
-    "Keep the scene description brief and avoid unnecessary "
-    "background, composition, mood, prop, or lighting details. "
-    "Do not choose or mention an art style, medium, rendering "
-    "technique, camera model, artist, genre label, or visual "
-    "finish. Return only the prompt text, with no "
-    "markdown, labels, or extra explanation."
-)
-
-LLM_SCENE_IMAGE_PROMPT_USER_PREFIX = (
-    "Use this JSON. Do not add style information."
 )
 
 LLM_COMPOSITE_LAYOUT_SYSTEM_MESSAGE = (

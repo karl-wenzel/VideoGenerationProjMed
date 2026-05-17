@@ -5,34 +5,31 @@ from typing import Any
 
 from PIL import Image, ImageChops, ImageFilter, ImageOps
 
-try:
-    from .prompt_config import (
-        COMPOSITE_CHARACTER_IDENTITY_SUMMARY_PREFIX,
-        COMPOSITE_CHARACTER_REFERENCE_PROMPT_LINES,
-        COMPOSITE_DEFAULT_SCENE_DESCRIPTION,
-        COMPOSITE_FALLBACK_BACKGROUND_PROMPT_LINES,
-        COMPOSITE_IMAGE_STYLE_PROMPT,
-        COMPOSITE_POSE_CLARITY_PROMPT_LINES,
-        QWEN_COMPOSITE_CHARACTER_POSE_PROMPT_LINES,
-        QWEN_COMPOSITE_SCENE_ACTION_SECTION_LABEL,
-        QWEN_COMPOSITE_SCENE_CHARACTER_IDENTITY_SECTION_LABEL,
-        QWEN_COMPOSITE_SCENE_ENVIRONMENT_SECTION_LABEL,
-        QWEN_COMPOSITE_SCENE_REFERENCE_INSTRUCTION_LINES,
-    )
-except ImportError:
-    from prompt_config import (
-        COMPOSITE_CHARACTER_IDENTITY_SUMMARY_PREFIX,
-        COMPOSITE_CHARACTER_REFERENCE_PROMPT_LINES,
-        COMPOSITE_DEFAULT_SCENE_DESCRIPTION,
-        COMPOSITE_FALLBACK_BACKGROUND_PROMPT_LINES,
-        COMPOSITE_IMAGE_STYLE_PROMPT,
-        COMPOSITE_POSE_CLARITY_PROMPT_LINES,
-        QWEN_COMPOSITE_CHARACTER_POSE_PROMPT_LINES,
-        QWEN_COMPOSITE_SCENE_ACTION_SECTION_LABEL,
-        QWEN_COMPOSITE_SCENE_CHARACTER_IDENTITY_SECTION_LABEL,
-        QWEN_COMPOSITE_SCENE_ENVIRONMENT_SECTION_LABEL,
-        QWEN_COMPOSITE_SCENE_REFERENCE_INSTRUCTION_LINES,
-    )
+from .image_generation_client import (
+    FLUX_MODEL,
+    VERBOSE,
+    b64_to_image,
+    generate_image_b64,
+    generate_scene_image_with_qwen,
+    load_story_spec,
+    sanitize_filename,
+    save_prompt_log,
+    select_character_images_for_scene,
+)
+from .llm_prompt_builder import build_composite_scene_layout_with_llm
+from .prompt_config import (
+    COMPOSITE_CHARACTER_IDENTITY_SUMMARY_PREFIX,
+    COMPOSITE_CHARACTER_REFERENCE_PROMPT_LINES,
+    COMPOSITE_DEFAULT_SCENE_DESCRIPTION,
+    COMPOSITE_FALLBACK_BACKGROUND_PROMPT_LINES,
+    COMPOSITE_IMAGE_STYLE_PROMPT,
+    COMPOSITE_POSE_CLARITY_PROMPT_LINES,
+    QWEN_COMPOSITE_CHARACTER_POSE_PROMPT_LINES,
+    QWEN_COMPOSITE_SCENE_ACTION_SECTION_LABEL,
+    QWEN_COMPOSITE_SCENE_CHARACTER_IDENTITY_SECTION_LABEL,
+    QWEN_COMPOSITE_SCENE_ENVIRONMENT_SECTION_LABEL,
+    QWEN_COMPOSITE_SCENE_REFERENCE_INSTRUCTION_LINES,
+)
 
 
 CHARACTER_REFERENCE_OUTPUT_DIR_NAME = "character_references"
@@ -54,30 +51,6 @@ def generate_composite_scene_images(
     size: str = "512x512",
 ) -> list[dict[str, Any]]:
     """Generate scenes with posed character cutouts and Qwen scene assembly."""
-    try:
-        from .image_scene_generator import (
-            FLUX_MODEL,
-            VERBOSE,
-            b64_to_image,
-            generate_image_b64,
-            generate_scene_image_with_qwen,
-            load_story_spec,
-            sanitize_filename,
-            save_prompt_log,
-            select_character_images_for_scene,
-        )
-    except ImportError:
-        from image_scene_generator import (
-            FLUX_MODEL,
-            VERBOSE,
-            b64_to_image,
-            generate_image_b64,
-            generate_scene_image_with_qwen,
-            load_story_spec,
-            sanitize_filename,
-            save_prompt_log,
-            select_character_images_for_scene,
-        )
 
     story_spec = load_story_spec(json_path)
     characters = story_spec["characters"]
@@ -253,21 +226,6 @@ def generate_composite_character_references(
     prompt_log: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
     """Generate one unnamed, single-subject reference image per character."""
-    try:
-        from .image_scene_generator import (
-            FLUX_MODEL,
-            b64_to_image,
-            generate_image_b64,
-            sanitize_filename,
-        )
-    except ImportError:
-        from image_scene_generator import (
-            FLUX_MODEL,
-            b64_to_image,
-            generate_image_b64,
-            sanitize_filename,
-        )
-
     generated_references: list[dict[str, Any]] = []
     output_path = Path(output_dir)
     output_path.mkdir(parents=True, exist_ok=True)
@@ -375,11 +333,6 @@ def build_scene_layout(
     verbose: bool,
 ) -> dict[str, Any]:
     """Return an LLM layout, falling back to deterministic prompts and boxes."""
-    try:
-        from .llm_prompt_builder import build_composite_scene_layout_with_llm
-    except ImportError:
-        from llm_prompt_builder import build_composite_scene_layout_with_llm
-
     scene_characters = [
         character_reference["character"]
         for character_reference in scene_character_references
