@@ -2,14 +2,31 @@ import json
 import os
 from typing import Any
 
+try:
+    from .prompt_config import (
+        LLM_COMPOSITE_LAYOUT_REPAIR_USER_MESSAGE,
+        LLM_COMPOSITE_LAYOUT_SYSTEM_MESSAGE,
+        LLM_COMPOSITE_LAYOUT_USER_PREFIX,
+        LLM_SCENE_IMAGE_PROMPT_OUTPUT_CONTRACT,
+        LLM_SCENE_IMAGE_PROMPT_SYSTEM_MESSAGE,
+        LLM_SCENE_IMAGE_PROMPT_USER_PREFIX,
+        SCENE_IMAGE_STYLE_PROMPT,
+    )
+except ImportError:
+    from prompt_config import (
+        LLM_COMPOSITE_LAYOUT_REPAIR_USER_MESSAGE,
+        LLM_COMPOSITE_LAYOUT_SYSTEM_MESSAGE,
+        LLM_COMPOSITE_LAYOUT_USER_PREFIX,
+        LLM_SCENE_IMAGE_PROMPT_OUTPUT_CONTRACT,
+        LLM_SCENE_IMAGE_PROMPT_SYSTEM_MESSAGE,
+        LLM_SCENE_IMAGE_PROMPT_USER_PREFIX,
+        SCENE_IMAGE_STYLE_PROMPT,
+    )
+
 
 CHAT_COMPLETIONS_BASE_URL = "https://saia.gwdg.de/v1"
 PROMPT_BUILDER_MODEL = "openai-gpt-oss-120b"
-STYLE_PROMPT = (
-    "Style: warm children's storybook illustration, gentle natural light, "
-    "soft painterly textures, expressive but friendly characters, coherent "
-    "composition, suitable for a picture book."
-)
+STYLE_PROMPT = SCENE_IMAGE_STYLE_PROMPT
 
 
 def _load_env_file_if_available() -> None:
@@ -56,32 +73,16 @@ def build_image_prompt_with_llm(
         "characters": characters,
         "scene": scene,
     }
-    output_contract = (
-        "Return a compact image prompt with should include: "
-        "character traits from the JSON, including clothing, "
-        "hair, accessories, and any other visual identity fields; "
-        "a brief description of the scene action and setting. "
-    )
     messages = [
         {
             "role": "system",
-            "content": (
-                "You write compact image prompts for image generation. "
-                "Your main job is enforcing character consistency. Include "
-                "all fixed visual character attributes provided by the user. "
-                "Keep the scene description brief and avoid unnecessary "
-                "background, composition, mood, prop, or lighting details. "
-                "Do not choose or mention an art style, medium, rendering "
-                "technique, camera model, artist, genre label, or visual "
-                "finish. Return only the prompt text, with no "
-                "markdown, labels, or extra explanation."
-            ),
+            "content": LLM_SCENE_IMAGE_PROMPT_SYSTEM_MESSAGE,
         },
         {
             "role": "user",
             "content": (
-                f"{output_contract}\n\n"
-                "Use this JSON. Do not add style information.\n\n"
+                f"{LLM_SCENE_IMAGE_PROMPT_OUTPUT_CONTRACT}\n\n"
+                f"{LLM_SCENE_IMAGE_PROMPT_USER_PREFIX}\n\n"
                 f"{json.dumps(story_context, ensure_ascii=False, indent=2)}"
             ),
         },
@@ -178,39 +179,12 @@ def build_composite_scene_layout_with_llm(
     messages = [
         {
             "role": "system",
-            "content": (
-                "You plan layered children's book image generation. Return only "
-                "valid JSON. The JSON must contain background_prompt and "
-                "characters. characters must be an array where each item has "
-                "name, pose_prompt, placement_box, and layer_order. "
-                "placement_box must contain x, y, width, and height as numbers "
-                "from 0 to 1. Names are only for internal matching. "
-                "background_prompt must describe only the setting. pose_prompt "
-                "must describe a full-body isolated character pose that can be "
-                "composited into the background. Infer concrete posture from "
-                "the scene activity, including whether the body is standing, "
-                "sitting, kneeling, crouching, reaching, looking, pointing, "
-                "carrying, or resting. Include facing direction, gesture, "
-                "expression, limb positions, and held objects. Keep "
-                "pose_prompt limited to the isolated character body, clothing, "
-                "held objects, expression, and action. Put all location, "
-                "surface, scenery, lighting, weather, props that are not held, "
-                "and environment details in background_prompt instead. Use "
-                "visual traits, not proper names. Image prompts should use "
-                "positive visual phrasing only."
-            ),
+            "content": LLM_COMPOSITE_LAYOUT_SYSTEM_MESSAGE,
         },
         {
             "role": "user",
             "content": (
-                "Create a composite layout plan for this scene. "
-                "Use compact image prompts. Make each character box large "
-                "enough for a clear full-body subject. The character pose "
-                "prompts will be rendered separately on a solid backdrop, so "
-                "they must be meaningful isolated body poses that visibly fit "
-                "the scene action after compositing. Keep scene objects and "
-                "setting details in background_prompt, and keep pose_prompt as "
-                "a character-only layer prompt.\n\n"
+                f"{LLM_COMPOSITE_LAYOUT_USER_PREFIX}\n\n"
                 f"{json.dumps(story_context, ensure_ascii=False, indent=2)}"
             ),
         },
@@ -257,12 +231,7 @@ def build_composite_scene_layout_with_llm(
             },
             {
                 "role": "user",
-                "content": (
-                    "Repair the previous response into only one valid JSON "
-                    "object with background_prompt and characters. Keep the "
-                    "same scene intent and preserve clear scene-matching body "
-                    "poses for every character."
-                ),
+                "content": LLM_COMPOSITE_LAYOUT_REPAIR_USER_MESSAGE,
             },
         ]
         if prompt_log is not None:

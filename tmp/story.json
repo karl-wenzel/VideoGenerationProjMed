@@ -3,18 +3,17 @@
     {
       "name": "Mika",
       "age": 5,
-      "description": "A shy little fox with soft brown fur and a fluffy tail, big curious eyes, and a tiny pink nose that twitches when she feels nervous.",
-      "clothes": "A simple leaf‑shaped scarf she wears around her neck.",
-      "hair_color": "brown",
-      "accessories": "none"
+      "description": "A shy little fox with soft brown fur and a fluffy tail, big curious eyes, and a tiny pink nose.",
+      "clothes": "A simple leaf‑shaped scarf around the neck.",
+      "hair_color": "brown fur",
+      "eye_color": "green"
     },
     {
       "name": "Lumi",
       "age": 3,
-      "description": "A brave firefly with a bright golden glow, tiny delicate wings that sparkle, and a friendly smile that lights up the dark.",
-      "clothes": "none",
-      "hair_color": "none",
-      "accessories": "none"
+      "description": "A firefly with a bright golden glow, tiny delicate wings that sparkle, and a friendly smile.",
+      "head_color": "yellow",
+      "eye_color": "brown"
     }
   ],
   "scenes": [

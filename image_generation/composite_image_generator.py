@@ -1,4 +1,3 @@
-import re
 import statistics
 from collections import deque
 from pathlib import Path
@@ -6,33 +5,43 @@ from typing import Any
 
 from PIL import Image, ImageChops, ImageFilter, ImageOps
 
+try:
+    from .prompt_config import (
+        COMPOSITE_CHARACTER_IDENTITY_SUMMARY_PREFIX,
+        COMPOSITE_CHARACTER_REFERENCE_PROMPT_LINES,
+        COMPOSITE_DEFAULT_SCENE_DESCRIPTION,
+        COMPOSITE_FALLBACK_BACKGROUND_PROMPT_LINES,
+        COMPOSITE_IMAGE_STYLE_PROMPT,
+        COMPOSITE_POSE_CLARITY_PROMPT_LINES,
+        QWEN_COMPOSITE_CHARACTER_POSE_PROMPT_LINES,
+        QWEN_COMPOSITE_SCENE_ACTION_SECTION_LABEL,
+        QWEN_COMPOSITE_SCENE_CHARACTER_IDENTITY_SECTION_LABEL,
+        QWEN_COMPOSITE_SCENE_ENVIRONMENT_SECTION_LABEL,
+        QWEN_COMPOSITE_SCENE_REFERENCE_INSTRUCTION_LINES,
+    )
+except ImportError:
+    from prompt_config import (
+        COMPOSITE_CHARACTER_IDENTITY_SUMMARY_PREFIX,
+        COMPOSITE_CHARACTER_REFERENCE_PROMPT_LINES,
+        COMPOSITE_DEFAULT_SCENE_DESCRIPTION,
+        COMPOSITE_FALLBACK_BACKGROUND_PROMPT_LINES,
+        COMPOSITE_IMAGE_STYLE_PROMPT,
+        COMPOSITE_POSE_CLARITY_PROMPT_LINES,
+        QWEN_COMPOSITE_CHARACTER_POSE_PROMPT_LINES,
+        QWEN_COMPOSITE_SCENE_ACTION_SECTION_LABEL,
+        QWEN_COMPOSITE_SCENE_CHARACTER_IDENTITY_SECTION_LABEL,
+        QWEN_COMPOSITE_SCENE_ENVIRONMENT_SECTION_LABEL,
+        QWEN_COMPOSITE_SCENE_REFERENCE_INSTRUCTION_LINES,
+    )
+
 
 CHARACTER_REFERENCE_OUTPUT_DIR_NAME = "character_references"
-SCENE_BACKGROUND_OUTPUT_DIR_NAME = "scene_backgrounds"
 SCENE_CHARACTER_POSE_OUTPUT_DIR_NAME = "scene_character_poses"
 CHARACTER_CUTOUT_OUTPUT_DIR_NAME = "character_cutouts"
 QWEN_COMPOSITE_REFERENCE_OUTPUT_DIR_NAME = "qwen_composite_references"
 COMPOSITE_SCENE_SIZE = "1344x768"
-COMPOSITE_STYLE_PROMPT = (
-    "Style: warm children's storybook illustration, gentle natural light, "
-    "soft painterly finish, expressive friendly subject, coherent composition, "
-    "suitable for a picture book."
-)
-FORBIDDEN_IMAGE_PROMPT_WORDS = (
-    "text",
-    "texts",
-    "letter",
-    "letters",
-    "label",
-    "labels",
-    "caption",
-    "captions",
-    "sign",
-    "signs",
-    "watermark",
-    "watermarks",
-)
-SOLID_BACKGROUND_RGB = (255, 0, 255)
+COMPOSITE_STYLE_PROMPT = COMPOSITE_IMAGE_STYLE_PROMPT
+QWEN_COMPOSITE_REFERENCE_BACKGROUND_RGB = (128, 128, 128)
 KEY_COLOR_TOLERANCE = 55
 MASK_FEATHER_RADIUS = 1.2
 
@@ -44,11 +53,10 @@ def generate_composite_scene_images(
     scene_output_dir: str | Path | None = None,
     size: str = "512x512",
 ) -> list[dict[str, Any]]:
-    """Generate scenes by compositing posed character cutouts over backgrounds."""
+    """Generate scenes with posed character cutouts and Qwen scene assembly."""
     try:
         from .image_scene_generator import (
             FLUX_MODEL,
-            USE_QWEN_FOR_COMPOSITE,
             VERBOSE,
             b64_to_image,
             generate_image_b64,
@@ -61,7 +69,6 @@ def generate_composite_scene_images(
     except ImportError:
         from image_scene_generator import (
             FLUX_MODEL,
-            USE_QWEN_FOR_COMPOSITE,
             VERBOSE,
             b64_to_image,
             generate_image_b64,
@@ -78,7 +85,6 @@ def generate_composite_scene_images(
 
     output_path = Path(output_dir)
     character_reference_dir = output_path / CHARACTER_REFERENCE_OUTPUT_DIR_NAME
-    background_dir = output_path / SCENE_BACKGROUND_OUTPUT_DIR_NAME
     pose_dir = output_path / SCENE_CHARACTER_POSE_OUTPUT_DIR_NAME
     cutout_dir = output_path / CHARACTER_CUTOUT_OUTPUT_DIR_NAME
     qwen_reference_dir = output_path / QWEN_COMPOSITE_REFERENCE_OUTPUT_DIR_NAME
@@ -90,7 +96,6 @@ def generate_composite_scene_images(
 
     for directory_path in [
         character_reference_dir,
-        background_dir,
         pose_dir,
         cutout_dir,
         qwen_reference_dir,
@@ -143,7 +148,6 @@ def generate_composite_scene_images(
                     character_reference["character"],
                     scene,
                     layout_character,
-                    characters,
                 )
                 pose_path = (
                     pose_dir
@@ -193,78 +197,39 @@ def generate_composite_scene_images(
                 )
 
             final_path = scene_dir / f"scene_{scene_index:03d}.png"
-            background_path: Path | None = None
-            background_prompt: str | None = None
-            qwen_reference_path: Path | None = None
-            qwen_scene_prompt: str | None = None
-
-            if USE_QWEN_FOR_COMPOSITE:
-                qwen_reference_path = (
-                    qwen_reference_dir
-                    / f"scene_{scene_index:03d}_character_layout.png"
-                )
-                create_character_layout_reference(
-                    character_layers,
-                    qwen_reference_path,
-                    COMPOSITE_SCENE_SIZE,
-                )
-                qwen_scene_prompt = build_qwen_composite_scene_prompt(
-                    layout,
-                    scene,
-                    scene_character_references,
-                    characters,
-                )
-                prompt_log.append(
-                    {
-                        "api_call": "qwen_composite_scene_generation",
-                        "scene_index": scene_index,
-                        "reference_image_path": str(qwen_reference_path),
-                        "prompt": qwen_scene_prompt,
-                    }
-                )
-                generate_scene_image_with_qwen(
-                    qwen_scene_prompt,
-                    qwen_reference_path,
-                    final_path,
-                )
-            else:
-                background_prompt = ensure_style_prompt(
-                    sanitize_image_prompt(
-                        str(layout["background_prompt"]),
-                        characters,
-                    )
-                )
-                background_path = (
-                    background_dir / f"scene_{scene_index:03d}_background.png"
-                )
-                prompt_log.append(
-                    {
-                        "api_call": "flux_composite_background_generation",
-                        "scene_index": scene_index,
-                        "prompt": background_prompt,
-                    }
-                )
-                background_data = generate_image_b64(
-                    background_prompt,
-                    size=COMPOSITE_SCENE_SIZE,
-                    model=FLUX_MODEL,
-                )
-                b64_to_image(background_data["b64_json"], background_path)
-                composite_layers(background_path, character_layers, final_path)
+            qwen_reference_path = (
+                qwen_reference_dir
+                / f"scene_{scene_index:03d}_character_layout.png"
+            )
+            create_character_layout_reference(
+                character_layers,
+                qwen_reference_path,
+                COMPOSITE_SCENE_SIZE,
+            )
+            qwen_scene_prompt = build_qwen_composite_scene_prompt(
+                layout,
+                scene,
+                scene_character_references,
+            )
+            prompt_log.append(
+                {
+                    "api_call": "qwen_composite_scene_generation",
+                    "scene_index": scene_index,
+                    "reference_image_path": str(qwen_reference_path),
+                    "prompt": qwen_scene_prompt,
+                }
+            )
+            generate_scene_image_with_qwen(
+                qwen_scene_prompt,
+                qwen_reference_path,
+                final_path,
+            )
 
             generated_images.append(
                 {
                     "scene_index": scene_index,
                     "output_path": str(final_path),
-                    "background_path": (
-                        str(background_path) if background_path is not None else None
-                    ),
-                    "background_prompt": background_prompt,
-                    "qwen_reference_path": (
-                        str(qwen_reference_path)
-                        if qwen_reference_path is not None
-                        else None
-                    ),
+                    "qwen_reference_path": str(qwen_reference_path),
                     "qwen_scene_prompt": qwen_scene_prompt,
                     "character_layers": character_layers,
                     "layout": layout,
@@ -312,7 +277,7 @@ def generate_composite_character_references(
             raise ValueError(f"Character {character_index} must be a JSON object.")
 
         character_name = str(character.get("name", f"character_{character_index}"))
-        prompt = build_character_reference_prompt(character, characters)
+        prompt = build_character_reference_prompt(character)
         prompt_log.append(
             {
                 "api_call": "flux_composite_character_reference_generation",
@@ -344,87 +309,59 @@ def generate_composite_character_references(
 
 def build_character_reference_prompt(
     character: dict[str, Any],
-    all_characters: list[dict[str, Any]],
 ) -> str:
     """Build a positive prompt for a single unnamed character reference."""
-    details = format_visual_character_details(character, all_characters)
+    details = format_visual_character_details(character)
     prompt_parts = [
-        "Single full-body subject.",
-        "Neutral standing pose.",
-        "Centered composition.",
-        "Plain solid light studio backdrop.",
-        "Clear silhouette and complete outfit.",
-        "Consistent storybook illustration.",
+        *COMPOSITE_CHARACTER_REFERENCE_PROMPT_LINES,
         *details,
         COMPOSITE_STYLE_PROMPT,
     ]
-    return sanitize_image_prompt("\n".join(prompt_parts), all_characters)
+    return "\n".join(prompt_parts)
 
 
 def build_qwen_composite_scene_prompt(
     layout: dict[str, Any],
     scene: dict[str, Any],
     scene_character_references: list[dict[str, Any]],
-    all_characters: list[dict[str, Any]],
 ) -> str:
     """Build the final Qwen prompt for the Qwen-assisted composite route."""
-    background_prompt = ensure_style_prompt(
-        sanitize_image_prompt(
-            str(layout["background_prompt"]),
-            all_characters,
-        )
-    )
-    scene_context = sanitize_image_prompt(
-        collect_scene_description(scene),
-        all_characters,
-    )
+    background_prompt = ensure_style_prompt(str(layout["background_prompt"]))
+    scene_context = collect_scene_description(scene)
     character_summary = build_character_identity_summary(
         scene_character_references,
-        all_characters,
     )
     reference_instruction = "\n".join(
-        [
-            "The uploaded image is a character layout reference.",
-            (
-                "Use exactly the visible uploaded characters as the complete "
-                "character cast."
-            ),
-            (
-                "Preserve their appearance, clothing, pose, scale, and relative "
-                "positions from the uploaded image."
-            ),
-            (
-                "Treat the flat solid-color canvas as a replaceable layout field "
-                "for the environment."
-            ),
-            (
-                "Fill the layout field with the storybook environment below, "
-                "integrating the characters with natural ground contact, "
-                "lighting, shadows, and depth."
-            ),
-        ]
+        QWEN_COMPOSITE_SCENE_REFERENCE_INSTRUCTION_LINES
     )
     return "\n\n".join(
         [
             reference_instruction,
-            f"Character identity guide:\n{character_summary}",
-            f"Scene action cue:\n{scene_context}",
-            f"Environment to create:\n{background_prompt}",
+            (
+                f"{QWEN_COMPOSITE_SCENE_CHARACTER_IDENTITY_SECTION_LABEL}\n"
+                f"{character_summary}"
+            ),
+            f"{QWEN_COMPOSITE_SCENE_ACTION_SECTION_LABEL}\n{scene_context}",
+            (
+                f"{QWEN_COMPOSITE_SCENE_ENVIRONMENT_SECTION_LABEL}\n"
+                f"{background_prompt}"
+            ),
         ]
     )
 
 
 def build_character_identity_summary(
     character_references: list[dict[str, Any]],
-    all_characters: list[dict[str, Any]],
 ) -> str:
     """Summarize visible character identities for final Qwen scene generation."""
     summary_lines = []
     for character_reference in character_references:
         character = character_reference["character"]
-        details = format_visual_character_details(character, all_characters)
+        details = format_visual_character_details(character)
         detail_text = "; ".join(details)
-        summary_lines.append(f"- Visible character: {detail_text}")
+        summary_lines.append(
+            f"{COMPOSITE_CHARACTER_IDENTITY_SUMMARY_PREFIX} {detail_text}"
+        )
 
     return "\n".join(summary_lines)
 
@@ -472,7 +409,7 @@ def validate_scene_layout(
     layout: dict[str, Any],
     scene_character_references: list[dict[str, Any]],
 ) -> dict[str, Any]:
-    """Validate required layout shape while allowing later prompt sanitization."""
+    """Validate required layout shape."""
     if not isinstance(layout.get("background_prompt"), str):
         raise ValueError("Composite layout requires a string background_prompt.")
 
@@ -530,8 +467,7 @@ def build_fallback_background_prompt(scene: dict[str, Any]) -> str:
     return ensure_style_prompt(
         "\n".join(
             [
-                "Empty storybook setting.",
-                "Open foreground space for later character compositing.",
+                *COMPOSITE_FALLBACK_BACKGROUND_PROMPT_LINES,
                 scene_text,
             ]
         )
@@ -550,9 +486,7 @@ def append_pose_clarity(prompt: str) -> str:
     """Add scene context and posture constraints to a pose prompt."""
     return "\n".join(
         [
-            "Render a character-only studio layer.",
-            "Show the scene activity through body posture, gesture, and expression.",
-            "Keep the pose as an isolated subject layer for later compositing.",
+            *COMPOSITE_POSE_CLARITY_PROMPT_LINES,
             prompt,
         ]
     )
@@ -570,38 +504,30 @@ def collect_scene_description(scene: dict[str, Any]) -> str:
         if value:
             return str(value)
 
-    return "Gentle story moment in a picture book scene."
+    return COMPOSITE_DEFAULT_SCENE_DESCRIPTION
 
 
 def build_pose_prompt(
     character: dict[str, Any],
     scene: dict[str, Any],
     layout_character: dict[str, Any],
-    all_characters: list[dict[str, Any]],
 ) -> str:
     """Build a positive Qwen edit prompt for an isolated posed character."""
     pose_action = str(
         layout_character.get("pose_prompt") or build_fallback_pose_action(scene)
     )
-    details = format_visual_character_details(character, all_characters)
+    details = format_visual_character_details(character)
     prompt_parts = [
-        "Use the provided reference image as the identity guide.",
-        "Single full-body subject.",
-        "Uniform flat pure magenta #ff00ff studio backdrop from edge to edge.",
-        "Centered isolated subject.",
-        "Clear silhouette.",
-        "Character-only layer.",
-        "Scene-specific body pose and expression:",
+        *QWEN_COMPOSITE_CHARACTER_POSE_PROMPT_LINES,
         append_pose_clarity(pose_action),
         *details,
         COMPOSITE_STYLE_PROMPT,
     ]
-    return sanitize_image_prompt("\n".join(prompt_parts), all_characters)
+    return "\n".join(prompt_parts)
 
 
 def format_visual_character_details(
     character: dict[str, Any],
-    all_characters: list[dict[str, Any]],
 ) -> list[str]:
     """Format visual character metadata while omitting internal identifiers."""
     omitted_keys = {"name", "id", "character_name"}
@@ -613,57 +539,7 @@ def format_visual_character_details(
         label = key.replace("_", " ").title()
         detail_lines.append(f"{label}: {value}")
 
-    return [
-        sanitize_image_prompt(detail_line, all_characters)
-        for detail_line in detail_lines
-    ]
-
-
-def sanitize_image_prompt(
-    prompt: str,
-    characters: list[dict[str, Any]],
-) -> str:
-    """Remove image-model trigger words from prompts sent to image endpoints."""
-    sanitized_prompt = prompt
-    for character in characters:
-        name = character.get("name")
-        if not name:
-            continue
-
-        sanitized_prompt = re.sub(
-            rf"\b{re.escape(str(name))}\b",
-            "the subject",
-            sanitized_prompt,
-            flags=re.IGNORECASE,
-        )
-
-    forbidden_pattern = "|".join(
-        re.escape(forbidden_word)
-        for forbidden_word in FORBIDDEN_IMAGE_PROMPT_WORDS
-    )
-    sanitized_prompt = re.sub(
-        rf"\b({forbidden_pattern})\b",
-        "",
-        sanitized_prompt,
-        flags=re.IGNORECASE,
-    )
-    sanitized_prompt = re.sub(r"[ \t]{2,}", " ", sanitized_prompt)
-    sanitized_prompt = re.sub(r" +([.,:;])", r"\1", sanitized_prompt)
-    cleaned_lines = []
-    for line in sanitized_prompt.splitlines():
-        cleaned_line = line.strip()
-        for _ in range(3):
-            cleaned_line = re.sub(
-                r"\b(with|beside|near|holding|wearing|showing|including|and|a|an|the)\s*$",
-                "",
-                cleaned_line,
-                flags=re.IGNORECASE,
-            ).strip()
-
-        if cleaned_line:
-            cleaned_lines.append(cleaned_line)
-
-    return "\n".join(cleaned_lines).strip()
+    return detail_lines
 
 
 def map_layout_characters_by_name(
@@ -908,32 +784,6 @@ def pixel_is_magenta_backdrop(pixel: tuple[int, int, int]) -> bool:
     )
 
 
-def composite_layers(
-    background_path: str | Path,
-    character_layers: list[dict[str, Any]],
-    output_path: str | Path,
-) -> Path:
-    """Composite cutout layers over a background image."""
-    with Image.open(background_path) as background_image:
-        canvas = background_image.convert("RGBA")
-
-    for layer in sorted(character_layers, key=lambda item: item["layer_order"]):
-        with Image.open(layer["cutout_path"]) as cutout_image:
-            cutout = cutout_image.convert("RGBA")
-
-        placed_cutout, paste_position = fit_cutout_to_box(
-            cutout,
-            layer["placement_box"],
-            canvas.size,
-        )
-        canvas.alpha_composite(placed_cutout, paste_position)
-
-    resolved_output_path = Path(output_path)
-    resolved_output_path.parent.mkdir(parents=True, exist_ok=True)
-    canvas.convert("RGB").save(resolved_output_path)
-    return resolved_output_path
-
-
 def create_character_layout_reference(
     character_layers: list[dict[str, Any]],
     output_path: str | Path,
@@ -941,7 +791,11 @@ def create_character_layout_reference(
 ) -> Path:
     """Create a solid-color character layout reference for Qwen scene assembly."""
     canvas_size = parse_image_size(size)
-    canvas = Image.new("RGBA", canvas_size, (*SOLID_BACKGROUND_RGB, 255))
+    canvas = Image.new(
+        "RGBA",
+        canvas_size,
+        (*QWEN_COMPOSITE_REFERENCE_BACKGROUND_RGB, 255),
+    )
 
     for layer in sorted(character_layers, key=lambda item: item["layer_order"]):
         with Image.open(layer["cutout_path"]) as cutout_image:
