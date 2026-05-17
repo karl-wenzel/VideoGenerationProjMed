@@ -17,21 +17,82 @@ MOOD_STYLE = {
 }
 
 def detect_mood(scene):
-    text = (scene["summary"] + " " + scene["first_sentence"] + " " + scene["last_sentence"]).lower()
+    text = (
+        scene.get("summary", "") + " " +
+        scene.get("first_sentence", "") + " " +
+        scene.get("last_sentence", "")
+    ).lower()
 
-    if "storm" in text or "lost" in text:
-        return "worried"
-    if "celebrate" in text or "picnic" in text or "magical" in text or "proud" in text:
-        return "happy"
-    if "fireflies" in text or "evening" in text or "stars" in text or "quiet" in text:
+    mood_keywords = {
+        "happy": [
+            "happy", "joyful", "cheerful", "delighted", "excited", "thrilled",
+            "pleased", "content", "satisfied", "optimistic",
+            "bright", "sunny", "lively", "playful", "energetic", "vibrant", "uplifting",
+            "smiling", "laughing", "celebrating", "dancing", "enjoying",
+            "euphoric", "blissful", "radiant", "carefree", "ecstatic",
+            "celebrate", "picnic", "magical", "proud"
+        ],
+
+        "worried": [
+            "worried", "anxious", "nervous", "stressed", "uneasy", "concerned",
+            "afraid", "fearful", "tense",
+            "dark", "uncertain", "uncomfortable", "restless", "troubled",
+            "shaking", "hesitating", "panicking", "overthinking",
+            "insecure", "paranoid", "overwhelmed", "distressed", "apprehensive",
+            "storm", "lost", "scared", "danger", "fear"
+        ],
+
+        "calm": [
+            "calm", "peaceful", "relaxed", "quiet", "still", "gentle", "serene",
+            "soft", "smooth", "tranquil", "balanced", "stable", "meditative",
+            "ocean breeze", "silence", "slow", "flowing", "harmony",
+            "soothing", "composed", "restful", "mindful", "untroubled",
+            "fireflies", "evening", "stars"
+        ],
+
+        "warm": [
+            "warm", "cozy", "comforting", "affectionate", "friendly", "loving", "tender",
+            "soft light", "fireplace", "homey", "intimate", "golden",
+            "caring", "heartfelt", "welcoming", "supportive",
+            "blanket", "candlelight", "hug", "family", "sunset",
+            "nostalgic", "wholesome", "sincere", "gentle-hearted",
+            "help", "rebuild", "smile"
+        ],
+
+        "mysterious": [
+            "mysterious", "strange", "unknown", "hidden", "secretive", "cryptic", "enigmatic",
+            "shadowy", "foggy", "eerie", "haunting", "silent",
+            "moonlight", "whisper", "forest", "abandoned", "mist",
+            "surreal", "uncanny", "obscure", "puzzling", "supernatural",
+            "shadows", "secret"
+        ],
+
+        "adventurous": [
+            "adventurous", "daring", "bold", "fearless", "curious", "wild", "brave",
+            "exciting", "dynamic", "unpredictable", "thrilling", "energetic",
+            "journey", "exploration", "mountain", "ocean", "travel", "discovery",
+            "climbing", "wandering", "discovering", "risking", "chasing",
+            "pioneering", "ambitious", "rebellious", "untamed",
+            "courage"
+        ]
+    }
+
+    scores = {}
+
+    for mood, keywords in mood_keywords.items():
+        score = 0
+        for word in keywords:
+            if word in text:
+                score += 1
+        scores[mood] = score
+
+    best_mood = max(scores, key=scores.get)
+
+    if scores[best_mood] == 0:
         return "calm"
-    if "help" in text or "rebuild" in text or "warm" in text:
-        return "warm"
-    if "shadows" in text:
-        return "mysterious"
-    if "brave" in text:
-        return "adventure"
-    return "calm"
+
+    return best_mood
+
 
 BGM_MAP = {
     "happy": "bgm/happy.wav",
@@ -54,8 +115,8 @@ async def generate_scene_audio(scene, scene_id):
     style = MOOD_STYLE.get(mood, MOOD_STYLE["calm"])
 
     #output file names
-    voice_output = f"scene(2)_{scene_id}_voice.mp3"
-    final_output = f"scene(2)_{scene_id}_final.mp3"
+    voice_output = f"scene(1)_{scene_id}_voice.mp3"
+    final_output = f"scene(1)_{scene_id}_final.mp3"
 
     #create TTS narrator
     communicate = edge_tts.Communicate(
@@ -109,7 +170,7 @@ def add_background_music(voice_file, mood, output_file):
 
 async def main():
     #load JSON input
-    with open("example_input2.json", "r", encoding="utf-8") as file:
+    with open("tmp/tmp_story.json", "r", encoding="utf-8") as file:
         data = json.load(file)
 
     #process each scene
