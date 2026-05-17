@@ -4,3 +4,5 @@ tmp_image_generated/*
 .idea/
 .gitignore
 image_generation/__pycache__/
+.DS_Store
+tmp/.DS_Store
