@@ -2,6 +2,7 @@ import asyncio
 import json
 import edge_tts
 from pydub import AudioSegment
+import os
 
 NARRATOR_VOICE = "en-GB-RyanNeural"
 
@@ -107,6 +108,9 @@ BGM_MAP = {
 
 
 async def generate_scene_audio(scene, scene_id):
+    # ensure tmp folder exists
+    os.makedirs("tmp", exist_ok=True)
+
     #combine scene text
     text = scene["first_sentence"] + " " + scene["summary"] + " " + scene["last_sentence"]
 
@@ -115,8 +119,8 @@ async def generate_scene_audio(scene, scene_id):
     style = MOOD_STYLE.get(mood, MOOD_STYLE["calm"])
 
     #output file names
-    voice_output = f"scene(1)_{scene_id}_voice.mp3"
-    final_output = f"scene(1)_{scene_id}_final.mp3"
+    voice_output = f"tmp/scene(1)_{scene_id}_voice.mp3"
+    final_output = f"tmp/scene(1)_{scene_id}_final.mp3"
 
     #create TTS narrator
     communicate = edge_tts.Communicate(
