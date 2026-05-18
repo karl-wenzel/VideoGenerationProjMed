@@ -16,23 +16,25 @@ def create_story_video(image_folder, audio_folder, output_name="final_story.mp4"
         # 1. Audio laden, um die Länge zu bestimmen
         audio_clip = AudioFileClip(audio_path)
         
-        # 2. Bild laden und die Dauer exakt auf die Audio-Länge setzen
-        img_clip = ImageClip(img_path).with_duration(audio_clip.duration)
+        # 2. Audio-Länge + 1 Sekunden Pause
+        gesamtdauer = audio_clip.duration + 1
+        img_clip = ImageClip(img_path).with_duration(gesamtdauer)
         
-        # 3. Audio dem Bild hinzufügen
+        # 3. Audio dem Bild hinzufügen (Ton endet früher, Bild bleibt)
         img_clip = img_clip.with_audio(audio_clip)
         
         clips.append(img_clip)
 
     # Alle Szenen hintereinander hängen
     if clips:
-        print(f"Verarbeite {len(clips)} Szenen...")
+        print(f"Verarbeite {len(clips)} Szenen (inklusive jeweils 2 Sek. Pause)...")
         final_video = concatenate_videoclips(clips, method="compose")
-        # fps=24 ist Standard für flüssige Diashows
+        
+        # Rendern mit Mac-kompatiblem Audio-Codec
         final_video.write_videofile(output_name, fps=24, codec="libx264", audio_codec="aac")
         print(f"Erfolg! Video erstellt: {output_name}")
     else:
         print("Keine passenden Dateien gefunden!")
 
-# TEST-LAUF
-create_story_video("generated_images", "generated_audios") 
+# START
+create_story_video("generated_images", "generated_audios")
