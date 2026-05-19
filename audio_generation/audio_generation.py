@@ -101,7 +101,7 @@ BGM_MAP = {
     "mysterious": "bgm/mysterious.wav",
     "scary": "bgm/scary.wav",
     "calm": "bgm/calm.wav",
-    "adventure": "bgm/adventure.wav",
+    "adventurous": "bgm/adventurous.wav",
     "worried": "bgm/worried.wav",
     "warm": "bgm/warm.wav"
 }
@@ -119,8 +119,8 @@ async def generate_scene_audio(scene, scene_id):
     style = MOOD_STYLE.get(mood, MOOD_STYLE["calm"])
 
     #output file names
-    voice_output = f"tmp/scene(1)_{scene_id}_voice.mp3"
-    final_output = f"tmp/scene(1)_{scene_id}_final.mp3"
+    voice_output = f"tmp/scene(2)_{scene_id}_voice.mp3"
+    final_output = f"tmp/scene(2)_{scene_id}_final.mp3"
 
     #create TTS narrator
     communicate = edge_tts.Communicate(
@@ -146,26 +146,45 @@ async def generate_scene_audio(scene, scene_id):
     
 
 
+SCENE_BUFFER_MS = 400
+BGM_FADE_IN_MS = 500
+BGM_FADE_OUT_MS = 1000
+
 def add_background_music(voice_file, mood, output_file):
+
     # load narration audio
     voice = AudioSegment.from_file(voice_file)
 
-    #select BGM based on mood
+    # small buffer
+    silence = AudioSegment.silent(duration=SCENE_BUFFER_MS)
+
+    voice = silence + voice + silence
+
+    # select BGM
     bgm_path = BGM_MAP.get(mood, "bgm/calm.wav")
 
-    # load BGM music
+    # load BGM
     bgm = AudioSegment.from_file(bgm_path)
 
-    # reduce BGM volume
-    bgm = bgm - 20
+    while len(bgm) < len(voice):
+        bgm += bgm
 
-    # trim BGN to narration lenth
     bgm = bgm[:len(voice)]
 
-    # mix narration and BGM
+
+    bgm = bgm - 20
+
+    # fade_in,fade_out
+    bgm = bgm.fade_in(BGM_FADE_IN_MS)
+    bgm = bgm.fade_out(BGM_FADE_OUT_MS)
+
+    # mix the narration with bgm
     final_audio = bgm.overlay(voice)
 
-    # export final audio
+    
+    final_audio = final_audio.fade_out(500)
+
+    #save the file in tmp
     final_audio.export(output_file, format="mp3")
 
     print(f"Final audio with BGM saved: {output_file}")
