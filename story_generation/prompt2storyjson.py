@@ -63,8 +63,6 @@ story_schema = {
     "additionalProperties": False
 }
 
-user_query = "A bedtime story about a shy fox named mika with bown hair and a brave firefly who help the moon find its glow again."
-
 system_prompt = """
 You are a children's story generator for slideshow creation.
 
@@ -93,31 +91,39 @@ Important:
 - Do not include any text outside the JSON object.
 """.strip()
 
-response = client.chat.completions.create(
-    model="openai-gpt-oss-120b",
-    messages=[
-        {"role": "system", "content": system_prompt},
-        {"role": "user", "content": user_query}
-    ],
-    response_format={
-        "type": "json_schema",
-        "json_schema": {
-            "name": "children_story_slideshow",
-            "strict": True,
-            "schema": story_schema
-        }
-    },
-    temperature=0.8
-)
 
-content = response.choices[0].message.content
-story_data = json.loads(content)
+def generate_story(user_prompt: str) -> dict:
+    response = client.chat.completions.create(
+        model="openai-gpt-oss-120b",
+        messages=[
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt}
+        ],
+        response_format={
+            "type": "json_schema",
+            "json_schema": {
+                "name": "children_story_slideshow",
+                "strict": True,
+                "schema": story_schema
+            }
+        },
+        temperature=0.8
+    )
 
-base_dir = Path(__file__).resolve().parent
-output_path = base_dir.parent / "tmp" / "story.json"
-output_path.parent.mkdir(parents=True, exist_ok=True)
+    content = response.choices[0].message.content
+    story_data = json.loads(content)
 
-with output_path.open("w", encoding="utf-8") as f:
-    json.dump(story_data, f, indent=2, ensure_ascii=False)
+    base_dir = Path(__file__).resolve().parent
+    output_path = base_dir.parent / "tmp" / "story.json"
+    output_path.parent.mkdir(parents=True, exist_ok=True)
 
-print(f"Saved to: {output_path}")
+    with output_path.open("w", encoding="utf-8") as f:
+        json.dump(story_data, f, indent=2, ensure_ascii=False)
+
+    print(f"Saved to: {output_path}")
+    return story_data
+
+
+if __name__ == "__main__":
+    user_query = "A bedtime story about a shy fox named mika with bown hair and a brave firefly who help the moon find its glow again."
+    generate_story(user_query)
