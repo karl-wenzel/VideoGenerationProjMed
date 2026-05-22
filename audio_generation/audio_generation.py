@@ -4,6 +4,9 @@ import edge_tts
 from pydub import AudioSegment
 import os
 
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+BGM_DIR = os.path.dirname(os.path.abspath(__file__))  # ./audio_generation/
+
 NARRATOR_VOICE = "en-GB-RyanNeural"
 
 MOOD_STYLE = {
@@ -161,7 +164,7 @@ def add_background_music(voice_file, mood, output_file):
     voice = silence + voice + silence
 
     # select BGM
-    bgm_path = BGM_MAP.get(mood, "bgm/calm.wav")
+    bgm_path = os.path.join(BGM_DIR, BGM_MAP.get(mood, "bgm/calm.wav"))
 
     # load BGM
     bgm = AudioSegment.from_file(bgm_path)
@@ -193,11 +196,12 @@ def add_background_music(voice_file, mood, output_file):
 
 async def main():
     #load JSON input
-    with open("tmp/tmp_story.json", "r", encoding="utf-8") as file:
+    with open(os.path.join(BASE_DIR, "tmp", "story.json"), "r", encoding="utf-8") as file:
         data = json.load(file)
 
     #process each scene
     for index, scene in enumerate(data["scenes"], start=1):
         await generate_scene_audio(scene, index)
 
-asyncio.run(main())
+if __name__ == "__main__":
+    asyncio.run(main())
