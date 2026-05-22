@@ -6,3 +6,7 @@ tmp_image_generated/*
 image_generation/__pycache__/
 .DS_Store
 tmp/.DS_Store
+audio_generation/__pycache__/
+story_generation/__pycache__/
+video_generation/__pycache__/
+tmp/
