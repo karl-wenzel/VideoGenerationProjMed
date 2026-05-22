@@ -37,4 +37,5 @@ def create_story_video(image_folder, audio_folder, output_name="final_story.mp4"
         print("Keine passenden Dateien gefunden!")
 
 # START
-create_story_video("generated_images", "generated_audios")
+if __name__ == "__main__":
+    create_story_video("generated_images", "generated_audios")
