@@ -46,7 +46,7 @@ from image_generation.image_generation_client import (
     DEFAULT_SCENE_OUTPUT_DIR as SCENE_OUTPUT_DIR,
 )
 
-AUDIO_OUTPUT_DIR = TMP_DIR          # audio_generation writes here already
+AUDIO_OUTPUT_DIR = TMP_DIR / "tmp_audio_generation"    / "final"   # audio_generation writes here already
 VIDEO_OUTPUT     = ROOT / "tmp" / "final_story.mp4"
 
 
@@ -124,4 +124,4 @@ def main(user_prompt: str = DEFAULT_PROMPT) -> None:
 
 
 if __name__ == "__main__":
-    main()
+    main("two girls exploring a hidden village and meeting animals which can speak?")

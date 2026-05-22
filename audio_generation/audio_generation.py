@@ -111,8 +111,11 @@ BGM_MAP = {
 
 
 async def generate_scene_audio(scene, scene_id):
-    # ensure tmp folder exists
-    os.makedirs("tmp", exist_ok=True)
+    tmp_voice_dir = os.path.join(BASE_DIR, "tmp", "tmp_audio_generation", "voice")
+    os.makedirs(tmp_voice_dir, exist_ok=True)
+
+    tmp_final_dir = os.path.join(BASE_DIR, "tmp", "tmp_audio_generation", "final")
+    os.makedirs(tmp_final_dir, exist_ok=True)
 
     #combine scene text
     text = scene["first_sentence"] + " " + scene["summary"] + " " + scene["last_sentence"]
@@ -122,8 +125,8 @@ async def generate_scene_audio(scene, scene_id):
     style = MOOD_STYLE.get(mood, MOOD_STYLE["calm"])
 
     #output file names
-    voice_output = f"tmp/scene(2)_{scene_id}_voice.mp3"
-    final_output = f"tmp/scene(2)_{scene_id}_final.mp3"
+    voice_output = os.path.join(tmp_voice_dir, f"scene(2)_{scene_id}_voice.mp3")
+    final_output = os.path.join(tmp_final_dir, f"scene(2)_{scene_id}_final.mp3")
 
     #create TTS narrator
     communicate = edge_tts.Communicate(
