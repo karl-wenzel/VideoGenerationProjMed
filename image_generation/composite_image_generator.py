@@ -1,9 +1,15 @@
 import statistics
+from collections.abc import Callable
 from collections import deque
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
+import random
+import threading
+import time
 from typing import Any
 
 from PIL import Image, ImageChops, ImageFilter, ImageOps
+import requests
 
 from .image_generation_client import (
     FLUX_MODEL,
@@ -25,6 +31,7 @@ from .prompt_config import (
     COMPOSITE_FALLBACK_BACKGROUND_PROMPT_LINES,
     COMPOSITE_IMAGE_STYLE_PROMPT,
     COMPOSITE_POSE_CLARITY_PROMPT_LINES,
+    CompositeGenerationOptions,
     QWEN_COMPOSITE_CHARACTER_POSE_PROMPT_LINES,
     QWEN_COMPOSITE_SCENE_ACTION_SECTION_LABEL,
     QWEN_COMPOSITE_SCENE_ENVIRONMENT_SECTION_LABEL,
@@ -47,6 +54,110 @@ QWEN_COMPOSITE_REFERENCE_BACKGROUND_RGB = (255, 0, 255)
 QWEN_COMPOSITE_MASK_BACKGROUND_TOLERANCE = 5
 KEY_COLOR_TOLERANCE = 55
 MASK_FEATHER_RADIUS = 1.2
+# The remote image services sometimes surface parallel saturation as generic
+# 5xx failures instead of an explicit rate-limit response, so retry those too.
+RETRYABLE_IMAGE_STATUS_CODES = {409, 429, 500, 502, 503, 504}
+RETRYABLE_IMAGE_ERROR_TERMS = (
+    "rate limit",
+    "too many requests",
+    "parallel",
+    "concurrency",
+    "concurrent",
+    "process limit",
+    "capacity",
+    "busy",
+)
+
+
+class ApiCallCoordinator:
+    """Limit concurrent remote calls and retry image API parallel-limit failures."""
+
+    def __init__(self, options: CompositeGenerationOptions) -> None:
+        self.options = options
+        self.semaphore = threading.BoundedSemaphore(
+            normalize_worker_count(options.max_api_workers)
+        )
+
+    def run_llm_call(self, operation: Callable[[], Any]) -> Any:
+        """Run a non-retried LLM call under the shared API concurrency cap."""
+        with self.semaphore:
+            return operation()
+
+    def run_image_call(
+        self,
+        operation: Callable[[], Any],
+        *,
+        api_call: str,
+        prompt_log: list[dict[str, Any]],
+    ) -> Any:
+        """Run an image API call with retry/backoff for parallel-limit errors."""
+        attempt = 1
+        while True:
+            try:
+                with self.semaphore:
+                    return operation()
+            except Exception as error:
+                if (
+                    attempt > self.options.max_retries
+                    or not is_retryable_image_generation_error(error)
+                ):
+                    raise
+
+                delay_seconds = calculate_retry_delay(self.options, attempt)
+                # Parallel image jobs can be rejected by the remote service; retry
+                # only those targeted limit failures instead of hiding real errors.
+                prompt_log.append(
+                    {
+                        "api_call": "image_generation_retry",
+                        "failed_api_call": api_call,
+                        "attempt": attempt,
+                        "next_attempt": attempt + 1,
+                        "delay_seconds": round(delay_seconds, 3),
+                        "error": str(error),
+                    }
+                )
+                if VERBOSE:
+                    print(
+                        "Retrying image API call after parallel/rate limit: "
+                        f"{api_call} attempt {attempt + 1}"
+                    )
+                time.sleep(delay_seconds)
+                attempt += 1
+
+
+def normalize_worker_count(value: int) -> int:
+    """Keep user-provided worker counts safe for ThreadPoolExecutor/semaphores."""
+    return max(1, int(value))
+
+
+def calculate_retry_delay(
+    options: CompositeGenerationOptions,
+    attempt: int,
+) -> float:
+    """Calculate capped exponential backoff with small jitter."""
+    base_delay = max(0.0, float(options.retry_base_delay_seconds))
+    max_delay = max(base_delay, float(options.retry_max_delay_seconds))
+    exponential_delay = base_delay * (2 ** (attempt - 1))
+    jitter = random.uniform(0.0, min(1.0, base_delay))
+    return min(max_delay, exponential_delay + jitter)
+
+
+def is_retryable_image_generation_error(error: Exception) -> bool:
+    """Detect API errors caused by remote rate/concurrency/parallel limits."""
+    response = getattr(error, "response", None)
+    status_code = getattr(response, "status_code", None)
+    if status_code in RETRYABLE_IMAGE_STATUS_CODES:
+        return True
+
+    error_text_parts = [str(error).lower()]
+    if isinstance(error, requests.HTTPError) and error.response is not None:
+        try:
+            error_text_parts.append(error.response.text.lower())
+        except Exception:
+            pass
+
+    error_text = " ".join(error_text_parts)
+    return any(term in error_text for term in RETRYABLE_IMAGE_ERROR_TERMS)
 
 
 def generate_composite_scene_images(
@@ -55,9 +166,12 @@ def generate_composite_scene_images(
     output_dir: str | Path,
     scene_output_dir: str | Path | None = None,
     size: str = "512x512",
+    options: CompositeGenerationOptions | None = None,
 ) -> list[dict[str, Any]]:
     """Generate scenes with posed character cutouts and Qwen scene assembly."""
 
+    resolved_options = options or CompositeGenerationOptions()
+    api_coordinator = ApiCallCoordinator(resolved_options)
     story_spec = load_story_spec(json_path)
     characters = story_spec["characters"]
     scenes = story_spec["scenes"]
@@ -93,145 +207,50 @@ def generate_composite_scene_images(
             character_reference_dir,
             size=size,
             prompt_log=prompt_log,
+            options=resolved_options,
+            api_coordinator=api_coordinator,
         )
 
-        for scene_index, scene in enumerate(scenes, start=1):
-            if not isinstance(scene, dict):
-                raise ValueError(f"Scene {scene_index} must be a JSON object.")
+        scene_plans = build_scene_plans(
+            characters,
+            scenes,
+            character_references,
+            prompt_log,
+            options=resolved_options,
+            api_coordinator=api_coordinator,
+        )
 
-            scene_character_references = select_character_images_for_scene(
-                scene,
-                character_references,
-            )
-            layout = build_scene_layout(
-                characters,
-                scene,
-                scene_character_references,
-                prompt_log,
-                verbose=VERBOSE,
-            )
+        scene_worker_count = min(
+            normalize_worker_count(resolved_options.scene_workers),
+            max(1, len(scene_plans)),
+        )
+        scene_results: list[dict[str, Any]] = []
+        with ThreadPoolExecutor(max_workers=scene_worker_count) as executor:
+            futures = [
+                executor.submit(
+                    generate_one_composite_scene,
+                    scene_plan,
+                    characters,
+                    character_references,
+                    pose_dir,
+                    cutout_dir,
+                    qwen_reference_dir,
+                    qwen_mask_dir,
+                    scene_dir,
+                    resolved_options,
+                    api_coordinator,
+                )
+                for scene_plan in scene_plans
+            ]
+            for future in as_completed(futures):
+                scene_results.append(future.result())
 
-            character_layers: list[dict[str, Any]] = []
-            layout_characters = map_layout_characters_by_name(layout, characters)
-            fallback_boxes = build_fallback_placement_boxes(
-                len(scene_character_references)
-            )
-
-            for character_position, character_reference in enumerate(
-                scene_character_references
-            ):
-                character_name = str(character_reference["name"])
-                layout_character = layout_characters.get(
-                    character_name.lower(),
-                    {},
-                )
-                prompt = build_pose_prompt(
-                    character_reference["character"],
-                    scene,
-                    layout_character,
-                )
-                pose_path = (
-                    pose_dir
-                    / f"scene_{scene_index:03d}_character_"
-                    f"{character_reference['character_index']:03d}_"
-                    f"{sanitize_filename(character_name)}.png"
-                )
-                cutout_path = (
-                    cutout_dir
-                    / f"scene_{scene_index:03d}_character_"
-                    f"{character_reference['character_index']:03d}_"
-                    f"{sanitize_filename(character_name)}.png"
-                )
-                prompt_log.append(
-                    {
-                        "api_call": "qwen_composite_character_pose_generation",
-                        "scene_index": scene_index,
-                        "character_index": character_reference["character_index"],
-                        "character_name": character_name,
-                        "reference_image_path": character_reference["output_path"],
-                        "prompt": prompt,
-                    }
-                )
-                generate_scene_image_with_qwen(
-                    prompt,
-                    character_reference["output_path"],
-                    pose_path,
-                )
-
-                cutout_character_image(pose_path, cutout_path)
-                character_layers.append(
-                    {
-                        "character_index": character_reference["character_index"],
-                        "name": character_name,
-                        "pose_path": str(pose_path),
-                        "cutout_path": str(cutout_path),
-                        "placement_box": normalize_placement_box(
-                            layout_character.get("placement_box"),
-                            fallback_boxes[character_position],
-                        ),
-                        "layer_order": to_int(
-                            layout_character.get("layer_order"),
-                            character_position,
-                        ),
-                        "prompt": prompt,
-                    }
-                )
-
-            final_path = scene_dir / f"scene_{scene_index:03d}.png"
-            qwen_reference_path = (
-                qwen_reference_dir
-                / f"scene_{scene_index:03d}_character_layout.png"
-            )
-            create_character_layout_reference(
-                character_layers,
-                qwen_reference_path,
-                COMPOSITE_SCENE_SIZE,
-            )
-            qwen_mask_path: Path | None = None
-            if USE_QWEN_COMPOSITE_SCENE_CHARACTER_MASK:
-                qwen_mask_path = (
-                    qwen_mask_dir
-                    / f"scene_{scene_index:03d}_character_preservation_mask.png"
-                )
-                create_qwen_character_preservation_mask(
-                    qwen_reference_path,
-                    qwen_mask_path,
-                )
-
-            qwen_scene_prompt = build_qwen_composite_scene_prompt(
-                layout,
-                scene,
-                scene_character_references,
-            )
-            prompt_log.append(
-                {
-                    "api_call": "qwen_composite_scene_generation",
-                    "scene_index": scene_index,
-                    "reference_image_path": str(qwen_reference_path),
-                    "mask_image_path": str(qwen_mask_path) if qwen_mask_path else None,
-                    "uses_character_mask": qwen_mask_path is not None,
-                    "prompt": qwen_scene_prompt,
-                }
-            )
-            generate_scene_image_with_qwen(
-                qwen_scene_prompt,
-                qwen_reference_path,
-                final_path,
-                mask_image_path=qwen_mask_path,
-            )
-
-            generated_images.append(
-                {
-                    "scene_index": scene_index,
-                    "output_path": str(final_path),
-                    "qwen_reference_path": str(qwen_reference_path),
-                    "qwen_mask_path": str(qwen_mask_path) if qwen_mask_path else None,
-                    "qwen_scene_prompt": qwen_scene_prompt,
-                    "character_layers": character_layers,
-                    "layout": layout,
-                    "character_references": character_references,
-                }
-            )
+        for scene_result in sorted(
+            scene_results,
+            key=lambda item: item["generated_image"]["scene_index"],
+        ):
+            prompt_log.extend(scene_result["prompt_log"])
+            generated_images.append(scene_result["generated_image"])
     finally:
         prompt_log_path = save_prompt_log(prompt_log, output_path)
 
@@ -241,25 +260,299 @@ def generate_composite_scene_images(
     return generated_images
 
 
+def build_scene_plans(
+    characters: list[dict[str, Any]],
+    scenes: list[Any],
+    character_references: list[dict[str, Any]],
+    prompt_log: list[dict[str, Any]],
+    *,
+    options: CompositeGenerationOptions,
+    api_coordinator: ApiCallCoordinator,
+) -> list[dict[str, Any]]:
+    """Build all scene layouts in parallel after character references exist."""
+    indexed_scenes: list[tuple[int, dict[str, Any]]] = []
+    for scene_index, scene in enumerate(scenes, start=1):
+        if not isinstance(scene, dict):
+            raise ValueError(f"Scene {scene_index} must be a JSON object.")
+        indexed_scenes.append((scene_index, scene))
+
+    def build_one_scene_plan(
+        scene_index: int,
+        scene: dict[str, Any],
+    ) -> dict[str, Any]:
+        local_prompt_log: list[dict[str, Any]] = []
+        scene_character_references = select_character_images_for_scene(
+            scene,
+            character_references,
+        )
+        layout = build_scene_layout(
+            characters,
+            scene,
+            scene_character_references,
+            local_prompt_log,
+            verbose=VERBOSE,
+            api_coordinator=api_coordinator,
+        )
+        return {
+            "scene_index": scene_index,
+            "scene": scene,
+            "scene_character_references": scene_character_references,
+            "layout": layout,
+            "prompt_log": local_prompt_log,
+        }
+
+    worker_count = min(
+        normalize_worker_count(options.layout_workers),
+        max(1, len(indexed_scenes)),
+    )
+    scene_plans: list[dict[str, Any]] = []
+    with ThreadPoolExecutor(max_workers=worker_count) as executor:
+        futures = [
+            executor.submit(build_one_scene_plan, scene_index, scene)
+            for scene_index, scene in indexed_scenes
+        ]
+        for future in as_completed(futures):
+            scene_plans.append(future.result())
+
+    sorted_scene_plans = sorted(scene_plans, key=lambda item: item["scene_index"])
+    for scene_plan in sorted_scene_plans:
+        prompt_log.extend(scene_plan["prompt_log"])
+
+    return sorted_scene_plans
+
+
+def generate_one_composite_scene(
+    scene_plan: dict[str, Any],
+    characters: list[dict[str, Any]],
+    character_references: list[dict[str, Any]],
+    pose_dir: Path,
+    cutout_dir: Path,
+    qwen_reference_dir: Path,
+    qwen_mask_dir: Path,
+    scene_dir: Path,
+    options: CompositeGenerationOptions,
+    api_coordinator: ApiCallCoordinator,
+) -> dict[str, Any]:
+    """Generate one final scene image after its layout is available."""
+    scene_index = int(scene_plan["scene_index"])
+    scene = scene_plan["scene"]
+    scene_character_references = scene_plan["scene_character_references"]
+    layout = scene_plan["layout"]
+    prompt_log: list[dict[str, Any]] = []
+
+    character_layers = generate_scene_character_layers(
+        scene_index,
+        scene,
+        layout,
+        characters,
+        scene_character_references,
+        pose_dir,
+        cutout_dir,
+        options,
+        api_coordinator,
+        prompt_log,
+    )
+
+    final_path = scene_dir / f"scene_{scene_index:03d}.png"
+    qwen_reference_path = (
+        qwen_reference_dir
+        / f"scene_{scene_index:03d}_character_layout.png"
+    )
+    create_character_layout_reference(
+        character_layers,
+        qwen_reference_path,
+        COMPOSITE_SCENE_SIZE,
+    )
+    qwen_mask_path: Path | None = None
+    if USE_QWEN_COMPOSITE_SCENE_CHARACTER_MASK:
+        qwen_mask_path = (
+            qwen_mask_dir
+            / f"scene_{scene_index:03d}_character_preservation_mask.png"
+        )
+        create_qwen_character_preservation_mask(
+            qwen_reference_path,
+            qwen_mask_path,
+        )
+
+    qwen_scene_prompt = build_qwen_composite_scene_prompt(
+        layout,
+        scene,
+        scene_character_references,
+    )
+    prompt_log.append(
+        {
+            "api_call": "qwen_composite_scene_generation",
+            "scene_index": scene_index,
+            "reference_image_path": str(qwen_reference_path),
+            "mask_image_path": str(qwen_mask_path) if qwen_mask_path else None,
+            "uses_character_mask": qwen_mask_path is not None,
+            "prompt": qwen_scene_prompt,
+        }
+    )
+    api_coordinator.run_image_call(
+        lambda: generate_scene_image_with_qwen(
+            qwen_scene_prompt,
+            qwen_reference_path,
+            final_path,
+            mask_image_path=qwen_mask_path,
+        ),
+        api_call="qwen_composite_scene_generation",
+        prompt_log=prompt_log,
+    )
+
+    return {
+        "generated_image": {
+            "scene_index": scene_index,
+            "output_path": str(final_path),
+            "qwen_reference_path": str(qwen_reference_path),
+            "qwen_mask_path": str(qwen_mask_path) if qwen_mask_path else None,
+            "qwen_scene_prompt": qwen_scene_prompt,
+            "character_layers": character_layers,
+            "layout": layout,
+            "character_references": character_references,
+        },
+        "prompt_log": prompt_log,
+    }
+
+
+def generate_scene_character_layers(
+    scene_index: int,
+    scene: dict[str, Any],
+    layout: dict[str, Any],
+    characters: list[dict[str, Any]],
+    scene_character_references: list[dict[str, Any]],
+    pose_dir: Path,
+    cutout_dir: Path,
+    options: CompositeGenerationOptions,
+    api_coordinator: ApiCallCoordinator,
+    prompt_log: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Generate and cut out all character pose layers for one scene."""
+    layout_characters = map_layout_characters_by_name(layout, characters)
+    fallback_boxes = build_fallback_placement_boxes(
+        len(scene_character_references)
+    )
+
+    def generate_one_layer(
+        character_position: int,
+        character_reference: dict[str, Any],
+    ) -> dict[str, Any]:
+        local_prompt_log: list[dict[str, Any]] = []
+        character_name = str(character_reference["name"])
+        layout_character = layout_characters.get(
+            character_name.lower(),
+            {},
+        )
+        prompt = build_pose_prompt(
+            character_reference["character"],
+            scene,
+            layout_character,
+        )
+        pose_path = (
+            pose_dir
+            / f"scene_{scene_index:03d}_character_"
+            f"{character_reference['character_index']:03d}_"
+            f"{sanitize_filename(character_name)}.png"
+        )
+        cutout_path = (
+            cutout_dir
+            / f"scene_{scene_index:03d}_character_"
+            f"{character_reference['character_index']:03d}_"
+            f"{sanitize_filename(character_name)}.png"
+        )
+        local_prompt_log.append(
+            {
+                "api_call": "qwen_composite_character_pose_generation",
+                "scene_index": scene_index,
+                "character_index": character_reference["character_index"],
+                "character_name": character_name,
+                "reference_image_path": character_reference["output_path"],
+                "prompt": prompt,
+            }
+        )
+        api_coordinator.run_image_call(
+            lambda: generate_scene_image_with_qwen(
+                prompt,
+                character_reference["output_path"],
+                pose_path,
+            ),
+            api_call="qwen_composite_character_pose_generation",
+            prompt_log=local_prompt_log,
+        )
+
+        cutout_character_image(pose_path, cutout_path)
+        return {
+            "character_position": character_position,
+            "prompt_log": local_prompt_log,
+            "character_layer": {
+                "character_index": character_reference["character_index"],
+                "name": character_name,
+                "pose_path": str(pose_path),
+                "cutout_path": str(cutout_path),
+                "placement_box": normalize_placement_box(
+                    layout_character.get("placement_box"),
+                    fallback_boxes[character_position],
+                ),
+                "layer_order": to_int(
+                    layout_character.get("layer_order"),
+                    character_position,
+                ),
+                "prompt": prompt,
+            },
+        }
+
+    worker_count = min(
+        normalize_worker_count(options.pose_workers_per_scene),
+        max(1, len(scene_character_references)),
+    )
+    layer_results: list[dict[str, Any]] = []
+    with ThreadPoolExecutor(max_workers=worker_count) as executor:
+        futures = [
+            executor.submit(generate_one_layer, character_position, character_reference)
+            for character_position, character_reference in enumerate(
+                scene_character_references
+            )
+        ]
+        for future in as_completed(futures):
+            layer_results.append(future.result())
+
+    sorted_layer_results = sorted(
+        layer_results,
+        key=lambda item: item["character_position"],
+    )
+    for layer_result in sorted_layer_results:
+        prompt_log.extend(layer_result["prompt_log"])
+
+    return [
+        layer_result["character_layer"]
+        for layer_result in sorted_layer_results
+    ]
+
+
 def generate_composite_character_references(
     characters: list[dict[str, Any]],
     output_dir: str | Path,
     *,
     size: str,
     prompt_log: list[dict[str, Any]],
+    options: CompositeGenerationOptions,
+    api_coordinator: ApiCallCoordinator,
 ) -> list[dict[str, Any]]:
     """Generate one unnamed, single-subject reference image per character."""
-    generated_references: list[dict[str, Any]] = []
     output_path = Path(output_dir)
     output_path.mkdir(parents=True, exist_ok=True)
 
-    for character_index, character in enumerate(characters, start=1):
+    def generate_one_reference(
+        character_index: int,
+        character: dict[str, Any],
+    ) -> dict[str, Any]:
         if not isinstance(character, dict):
             raise ValueError(f"Character {character_index} must be a JSON object.")
 
+        local_prompt_log: list[dict[str, Any]] = []
         character_name = str(character.get("name", f"character_{character_index}"))
         prompt = build_character_reference_prompt(character)
-        prompt_log.append(
+        local_prompt_log.append(
             {
                 "api_call": "flux_composite_character_reference_generation",
                 "character_index": character_index,
@@ -268,22 +561,49 @@ def generate_composite_character_references(
             }
         )
 
-        image_data = generate_image_b64(prompt, size=size, model=FLUX_MODEL)
+        image_data = api_coordinator.run_image_call(
+            lambda: generate_image_b64(prompt, size=size, model=FLUX_MODEL),
+            api_call="flux_composite_character_reference_generation",
+            prompt_log=local_prompt_log,
+        )
         image_path = (
             output_path
             / f"character_{character_index:03d}_{sanitize_filename(character_name)}.png"
         )
         b64_to_image(image_data["b64_json"], image_path)
-        generated_references.append(
-            {
+        return {
+            "character_index": character_index,
+            "prompt_log": local_prompt_log,
+            "character_reference": {
                 "character_index": character_index,
                 "name": character_name,
                 "character": character,
                 "output_path": str(image_path),
                 "prompt": prompt,
                 "api_result": image_data,
-            }
-        )
+            },
+        }
+
+    worker_count = min(
+        normalize_worker_count(options.character_reference_workers),
+        max(1, len(characters)),
+    )
+    reference_results: list[dict[str, Any]] = []
+    with ThreadPoolExecutor(max_workers=worker_count) as executor:
+        futures = [
+            executor.submit(generate_one_reference, character_index, character)
+            for character_index, character in enumerate(characters, start=1)
+        ]
+        for future in as_completed(futures):
+            reference_results.append(future.result())
+
+    generated_references: list[dict[str, Any]] = []
+    for reference_result in sorted(
+        reference_results,
+        key=lambda item: item["character_index"],
+    ):
+        prompt_log.extend(reference_result["prompt_log"])
+        generated_references.append(reference_result["character_reference"])
 
     return generated_references
 
@@ -352,6 +672,7 @@ def build_scene_layout(
     prompt_log: list[dict[str, Any]],
     *,
     verbose: bool,
+    api_coordinator: ApiCallCoordinator | None = None,
 ) -> dict[str, Any]:
     """Return an LLM layout, falling back to deterministic prompts and boxes."""
     scene_characters = [
@@ -359,13 +680,19 @@ def build_scene_layout(
         for character_reference in scene_character_references
     ]
     try:
-        layout = build_composite_scene_layout_with_llm(
-            characters,
-            scene,
-            scene_characters,
-            verbose=verbose,
-            prompt_log=prompt_log,
-        )
+        def build_layout_with_llm() -> dict[str, Any]:
+            return build_composite_scene_layout_with_llm(
+                characters,
+                scene,
+                scene_characters,
+                verbose=verbose,
+                prompt_log=prompt_log,
+            )
+
+        if api_coordinator is None:
+            layout = build_layout_with_llm()
+        else:
+            layout = api_coordinator.run_llm_call(build_layout_with_llm)
         return validate_scene_layout(layout, scene_character_references)
     except Exception as error:
         fallback_layout = build_fallback_scene_layout(scene, scene_character_references)

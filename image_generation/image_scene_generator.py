@@ -8,6 +8,7 @@ if __package__ in {None, ""}:
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from image_generation.composite_image_generator import generate_composite_scene_images
+from image_generation.prompt_config import CompositeGenerationOptions
 from image_generation.image_generation_client import (
     DEFAULT_INPUT_PATH,
     DEFAULT_OUTPUT_DIR,
@@ -53,6 +54,7 @@ def generate_scene_images(
     output_dir: str | Path = DEFAULT_OUTPUT_DIR,
     scene_output_dir: str | Path = DEFAULT_SCENE_OUTPUT_DIR,
     size: str = "512x512",
+    options: CompositeGenerationOptions | None = None,
 ) -> list[dict[str, Any]]:
     """
     Generate one image for every scene in the story JSON.
@@ -64,6 +66,7 @@ def generate_scene_images(
         output_dir=output_dir,
         scene_output_dir=scene_output_dir,
         size=size,
+        options=options,
     )
 
 

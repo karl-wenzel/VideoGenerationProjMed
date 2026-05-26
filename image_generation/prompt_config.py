@@ -1,5 +1,21 @@
 """Central prompt configuration for image generation workflows."""
 
+from dataclasses import dataclass
+
+
+@dataclass(frozen=True)
+class CompositeGenerationOptions:
+    """Concurrency and retry settings for the composite image pipeline."""
+
+    character_reference_workers: int = 3
+    layout_workers: int = 2
+    scene_workers: int = 2
+    pose_workers_per_scene: int = 3
+    max_api_workers: int = 4
+    max_retries: int = 3
+    retry_base_delay_seconds: float = 2.0
+    retry_max_delay_seconds: float = 20.0
+
 USE_QWEN_COMPOSITE_SCENE_CHARACTER_MASK = True
 QWEN_COMPOSITE_SCENE_CHARACTER_MASK_EROSION_PIXELS = 3
 
