@@ -22,7 +22,7 @@ def create_story_video(image_folder, audio_folder, output_name):
         # 1. Audio laden
         audio_clip = AudioFileClip(audio_path)
         
-        # 2. Bild laden und exakt die Länge des Audios zuweisen (ohne Extra-Pause)
+        # 2. Bild laden und die Länge des Audios zuweisen
         img_clip = ImageClip(img_path).with_duration(audio_clip.duration)
         
         # 3. Audio an das frisch geladene Bild heften
@@ -41,7 +41,23 @@ def create_story_video(image_folder, audio_folder, output_name):
     else:
         print(f"Keine passenden Dateien gefunden in:\nBilder: {image_folder}\nAudios: {audio_folder}")
 
-# Der Test-Aufruf ganz unten ist nur aktiv, wenn man das Skript einzeln startet.
+
+# Der Test-Aufruf unten ist nur aktiv, wenn man das Skript einzeln startet.
 # Wenn main.py das Skript startet, wird das hier ignoriert.
 if __name__ == "__main__":
-    create_story_video("tmp", "tmp", "tmp/final_story.mp4")
+    
+    # 1. Wir holen uns den exakten Pfad, wo wir uns gerade befinden, und gehen einen Ordner nach oben
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    project_root = os.path.dirname(script_dir)
+    
+    # 2. Wir bauen die Pfade zusammen
+    test_image_folder = os.path.join(project_root, "tmp", "scene_images")
+    test_audio_folder = os.path.join(project_root, "tmp", "tmp_audio_generation", "final")
+    test_output_name = os.path.join(project_root, "tmp", "final_story_einzeltest.mp4")
+    
+    # Prüfen und starten
+    if os.path.exists(test_image_folder) and os.path.exists(test_audio_folder):
+        print("Ordner gefunden! Baue das Video zusammen...")
+        create_story_video(test_image_folder, test_audio_folder, test_output_name)
+    else:
+        print(f"Fehler: Ordner nicht gefunden.\nSuche Bilder in: {test_image_folder}\nSuche Audios in: {test_audio_folder}")
