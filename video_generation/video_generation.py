@@ -19,10 +19,13 @@ def create_story_video(image_folder, audio_folder, output_name):
         img_path = os.path.join(image_folder, images[i])
         audio_path = os.path.join(audio_folder, audios[i])
 
-        # Audio laden
+        # 1. Audio laden
         audio_clip = AudioFileClip(audio_path)
         
-        # Audio hinzufügen
+        # 2. Bild laden und exakt die Länge des Audios zuweisen (ohne Extra-Pause)
+        img_clip = ImageClip(img_path).with_duration(audio_clip.duration)
+        
+        # 3. Audio an das frisch geladene Bild heften
         img_clip = img_clip.with_audio(audio_clip)
         
         clips.append(img_clip)
