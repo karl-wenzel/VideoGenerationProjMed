@@ -125,8 +125,8 @@ async def generate_scene_audio(scene, scene_id):
     style = MOOD_STYLE.get(mood, MOOD_STYLE["calm"])
 
     #output file names
-    voice_output = os.path.join(tmp_voice_dir, f"scene(2)_{scene_id}_voice.mp3")
-    final_output = os.path.join(tmp_final_dir, f"scene(2)_{scene_id}_final.mp3")
+    voice_output = os.path.join(tmp_voice_dir, f"scene_{scene_id}_voice.mp3")
+    final_output = os.path.join(tmp_final_dir, f"scene_{scene_id}_final.mp3")
 
     #create TTS narrator
     communicate = edge_tts.Communicate(
@@ -149,12 +149,33 @@ async def generate_scene_audio(scene, scene_id):
 
     print(f"Generated {final_output} | mood={mood} | rate={style['rate']} | pitch={style['pitch']}")
 
-    
+
+
+async def generate_all_scene_audio(story: dict) -> None:
+
+    semaphore = asyncio.Semaphore(MAX_AUDIO_WORKERS)
+
+    async def limited_generate(scene, scene_id):
+
+        async with semaphore:
+
+            await generate_scene_audio(scene, scene_id)
+
+    tasks = [
+
+        limited_generate(scene, index)
+
+        for index, scene in enumerate(story["scenes"], start=1)
+
+    ]
+
+    await asyncio.gather(*tasks)    
 
 
 SCENE_BUFFER_MS = 400
 BGM_FADE_IN_MS = 500
 BGM_FADE_OUT_MS = 1000
+MAX_AUDIO_WORKERS = 4
 
 def add_background_music(voice_file, mood, output_file):
 
@@ -176,8 +197,6 @@ def add_background_music(voice_file, mood, output_file):
         bgm += bgm
 
     bgm = bgm[:len(voice)]
-
-
     bgm = bgm - 20
 
     # fade_in,fade_out
@@ -197,14 +216,35 @@ def add_background_music(voice_file, mood, output_file):
 
 
 
-async def main():
-    #load JSON input
-    with open(os.path.join(BASE_DIR, "tmp", "story.json"), "r", encoding="utf-8") as file:
-        data = json.load(file)
 
-    #process each scene
-    for index, scene in enumerate(data["scenes"], start=1):
-        await generate_scene_audio(scene, index)
+
+
+async def generate_all_scene_audio(story: dict) -> None:
+    semaphore = asyncio.Semaphore(MAX_AUDIO_WORKERS)
+
+    async def limited_generate(scene, scene_id):
+        async with semaphore:
+            await generate_scene_audio(scene, scene_id)
+
+    tasks = [
+        limited_generate(scene, index)
+        for index, scene in enumerate(story["scenes"], start=1)
+    ]
+
+    await asyncio.gather(*tasks)
+
+
+async def main():
+    with open(os.path.join(BASE_DIR, "tmp", "story.json"), "r", encoding="utf-8") as file:
+        story = json.load(file)
+
+    await generate_all_scene_audio(story)
+
+
+
+
+
+
 
 if __name__ == "__main__":
     asyncio.run(main())
