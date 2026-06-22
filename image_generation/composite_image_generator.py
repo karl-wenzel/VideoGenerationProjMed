@@ -28,7 +28,6 @@ from .prompt_config import (
     COMPOSITE_CHARACTER_IDENTITY_SUMMARY_PREFIX,
     COMPOSITE_CHARACTER_REFERENCE_PROMPT_LINES,
     COMPOSITE_DEFAULT_SCENE_DESCRIPTION,
-    COMPOSITE_FALLBACK_BACKGROUND_PROMPT_LINES,
     COMPOSITE_IMAGE_STYLE_PROMPT,
     COMPOSITE_POSE_CLARITY_PROMPT_LINES,
     CompositeGenerationOptions,
@@ -81,17 +80,73 @@ class ApiCallCoordinator:
 
     def __init__(self, options: CompositeGenerationOptions) -> None:
         self.options = options
-        self.semaphore = threading.BoundedSemaphore(
-            normalize_worker_count(options.max_api_workers)
+        self.llm_semaphore = threading.BoundedSemaphore(
+            normalize_worker_count(options.max_llm_api_workers)
+        )
+        self.image_semaphore = threading.BoundedSemaphore(
+            normalize_worker_count(options.max_image_api_workers)
         )
         self._image_start_lock = threading.Lock()
         self._next_image_api_start = 0.0
         self._image_api_cooldown_until = 0.0
 
-    def run_llm_call(self, operation: Callable[[], Any]) -> Any:
-        """Run a non-retried LLM call under the shared API concurrency cap."""
-        with self.semaphore:
-            return operation()
+    def run_llm_call(
+        self,
+        operation: Callable[[], Any],
+        *,
+        api_call: str,
+        prompt_log: list[dict[str, Any]],
+    ) -> Any:
+        """Run an LLM call with retry/backoff for transient failures."""
+        attempt = 1
+        while True:
+            try:
+                with self.llm_semaphore:
+                    return operation()
+            except Exception as error:
+                retryable = is_retryable_llm_generation_error(error)
+                if (
+                    attempt > self.options.max_retries
+                    or not retryable
+                ):
+                    prompt_log.append(
+                        {
+                            "api_call": "llm_generation_failed",
+                            "failed_api_call": api_call,
+                            "attempt": attempt,
+                            "max_retries": self.options.max_retries,
+                            "retryable": retryable,
+                            "error": describe_api_error(error),
+                        }
+                    )
+                    if VERBOSE:
+                        print(
+                            "LLM API call failed after retries: "
+                            f"{api_call} attempt {attempt}. "
+                            f"{describe_api_error(error)}"
+                        )
+                    raise
+
+                delay_seconds = calculate_retry_delay(self.options, attempt)
+                prompt_log.append(
+                    {
+                        "api_call": "llm_generation_retry",
+                        "failed_api_call": api_call,
+                        "attempt": attempt,
+                        "next_attempt": attempt + 1,
+                        "delay_seconds": round(delay_seconds, 3),
+                        "error": describe_api_error(error),
+                    }
+                )
+                if VERBOSE:
+                    print(
+                        "Retrying LLM API call after retryable failure: "
+                        f"{api_call} attempt {attempt + 1} "
+                        f"in {delay_seconds:.1f}s. "
+                        f"{describe_api_error(error)}"
+                    )
+                time.sleep(delay_seconds)
+                attempt += 1
 
     def run_image_call(
         self,
@@ -104,7 +159,7 @@ class ApiCallCoordinator:
         attempt = 1
         while True:
             try:
-                with self.semaphore:
+                with self.image_semaphore:
                     self.wait_for_image_api_turn()
                     return operation()
             except Exception as error:
@@ -258,6 +313,27 @@ def is_retryable_image_generation_error(error: Exception) -> bool:
     return any(term in error_text for term in RETRYABLE_IMAGE_ERROR_TERMS)
 
 
+def is_retryable_llm_generation_error(error: Exception) -> bool:
+    """Detect transient LLM failures and invalid layout responses worth retrying."""
+    status_code = getattr(error, "status_code", None)
+    if status_code in RETRYABLE_IMAGE_STATUS_CODES:
+        return True
+
+    response = getattr(error, "response", None)
+    response_status_code = getattr(response, "status_code", None)
+    if response_status_code in RETRYABLE_IMAGE_STATUS_CODES:
+        return True
+
+    if isinstance(error, requests.RequestException) and response is None:
+        return True
+
+    if isinstance(error, ValueError):
+        return True
+
+    error_text = str(error).lower()
+    return any(term in error_text for term in RETRYABLE_IMAGE_ERROR_TERMS)
+
+
 def is_rate_limit_error(error: Exception) -> bool:
     """Return True when the remote API explicitly reports rate limiting."""
     response = getattr(error, "response", None)
@@ -287,8 +363,15 @@ def get_retry_after_seconds(error: Exception) -> float | None:
 
 def describe_image_generation_error(error: Exception) -> str:
     """Return an HTTP error description with response details when available."""
+    return describe_api_error(error)
+
+
+def describe_api_error(error: Exception) -> str:
+    """Return an API error description with response details when available."""
     response = getattr(error, "response", None)
-    status_code = getattr(response, "status_code", None)
+    status_code = getattr(error, "status_code", None)
+    if status_code is None:
+        status_code = getattr(response, "status_code", None)
     detail_parts = [str(error)]
     if status_code is not None:
         detail_parts.append(f"status_code={status_code}")
@@ -812,36 +895,30 @@ def build_scene_layout(
     verbose: bool,
     api_coordinator: ApiCallCoordinator | None = None,
 ) -> dict[str, Any]:
-    """Return an LLM layout, falling back to deterministic prompts and boxes."""
+    """Return an LLM layout, retrying transient prompt-builder failures."""
     scene_characters = [
         character_reference["character"]
         for character_reference in scene_character_references
     ]
-    try:
-        def build_layout_with_llm() -> dict[str, Any]:
-            return build_composite_scene_layout_with_llm(
-                characters,
-                scene,
-                scene_characters,
-                verbose=verbose,
-                prompt_log=prompt_log,
-            )
 
-        if api_coordinator is None:
-            layout = build_layout_with_llm()
-        else:
-            layout = api_coordinator.run_llm_call(build_layout_with_llm)
-        return validate_scene_layout(layout, scene_character_references)
-    except Exception as error:
-        fallback_layout = build_fallback_scene_layout(scene, scene_character_references)
-        prompt_log.append(
-            {
-                "api_call": "composite_scene_layout_fallback",
-                "error": str(error),
-                "layout": fallback_layout,
-            }
+    def build_layout_with_llm() -> dict[str, Any]:
+        layout = build_composite_scene_layout_with_llm(
+            characters,
+            scene,
+            scene_characters,
+            verbose=verbose,
+            prompt_log=prompt_log,
         )
-        return fallback_layout
+        return validate_scene_layout(layout, scene_character_references)
+
+    if api_coordinator is None:
+        return build_layout_with_llm()
+
+    return api_coordinator.run_llm_call(
+        build_layout_with_llm,
+        api_call="composite_scene_layout_prompt_builder",
+        prompt_log=prompt_log,
+    )
 
 
 def validate_scene_layout(
@@ -878,39 +955,6 @@ def validate_scene_layout(
         "background_prompt": layout["background_prompt"],
         "characters": valid_characters,
     }
-
-
-def build_fallback_scene_layout(
-    scene: dict[str, Any],
-    scene_character_references: list[dict[str, Any]],
-) -> dict[str, Any]:
-    """Build a deterministic layout if LLM layout planning is unavailable."""
-    fallback_boxes = build_fallback_placement_boxes(len(scene_character_references))
-    return {
-        "background_prompt": build_fallback_background_prompt(scene),
-        "characters": [
-            {
-                "name": character_reference["name"],
-                "pose_prompt": build_fallback_pose_action(scene),
-                "placement_box": fallback_boxes[index],
-                "layer_order": index,
-            }
-            for index, character_reference in enumerate(scene_character_references)
-        ],
-    }
-
-
-def build_fallback_background_prompt(scene: dict[str, Any]) -> str:
-    """Build a simple setting-only prompt from scene text."""
-    scene_text = collect_scene_description(scene)
-    return ensure_style_prompt(
-        "\n".join(
-            [
-                *COMPOSITE_FALLBACK_BACKGROUND_PROMPT_LINES,
-                scene_text,
-            ]
-        )
-    )
 
 
 def ensure_style_prompt(prompt: str) -> str:

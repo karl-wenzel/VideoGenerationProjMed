@@ -11,7 +11,8 @@ class CompositeGenerationOptions:
     layout_workers: int = 6
     scene_workers: int = 6
     pose_workers_per_scene: int = 4
-    max_api_workers: int = 10
+    max_llm_api_workers: int = 6
+    max_image_api_workers: int = 5
     max_retries: int = 30
     retry_base_delay_seconds: float = 5.0
     retry_max_delay_seconds: float = 300.0
@@ -25,7 +26,7 @@ QWEN_COMPOSITE_SCENE_CHARACTER_MASK_EROSION_PIXELS = 3
 COMPOSITE_IMAGE_STYLE_PROMPT = (
     "Style: warm children's illustration, vivid colors, gentle natural light, "
     "soft painterly textures, brushstrokes, expressive, friendly subjects, "
-    "coherent composition. Painted, happy style."
+    "Painted, happy style."
 )
 
 COMPOSITE_CHARACTER_LAYER_STYLE_PROMPT = (
@@ -37,7 +38,7 @@ COMPOSITE_CHARACTER_LAYER_STYLE_PROMPT = (
 QWEN_COMPOSITE_SCENE_STYLE_PROMPT = (
     "Style: warm children's illustration, vivid colors, gentle natural light, "
     "soft painterly textures, detailed background, "
-    "brushstrokes, coherent composition. Painted, happy style."
+    "brushstrokes. Painted, happy style."
 )
 
 LLM_COMPOSITE_LAYOUT_SYSTEM_MESSAGE = (
@@ -95,7 +96,7 @@ QWEN_COMPOSITE_SCENE_REFERENCE_INSTRUCTION_LINES = (
     "The uploaded image is a character layout reference.",
     "Treat the visible uploaded characters as fixed foreground subjects.",
     "Use exactly those visible uploaded characters as the complete character cast.",
-    "Only replace the flat pure magenta #ff00ff canvas with the requested environment. Fill the whole background. Draw a coherent scene.",
+    "Only replace the flat pure magenta #ff00ff canvas with the requested environment. Carefully paint and decorate the whole background with details. Draw a complete scene.",
     "Keep the exact number of visible characters from the uploaded image.",
     (
         "Preserve their appearance, clothing, pose, scale, and relative "
