@@ -2,6 +2,8 @@ import json
 import os
 from typing import Any
 
+from pipeline_timing import track_api_call
+
 from .prompt_config import (
     LLM_COMPOSITE_LAYOUT_REPAIR_USER_MESSAGE,
     LLM_COMPOSITE_LAYOUT_SYSTEM_MESSAGE,
@@ -113,10 +115,15 @@ def build_composite_scene_layout_with_llm(
             }
         )
 
-    response = client.chat.completions.create(
-        model=model,
-        messages=messages,
-    )
+    with track_api_call(
+        "text",
+        "composite_scene_layout_prompt_builder",
+        {"model": model},
+    ):
+        response = client.chat.completions.create(
+            model=model,
+            messages=messages,
+        )
 
     layout_text = response.choices[0].message.content
     if not layout_text:
@@ -151,10 +158,15 @@ def build_composite_scene_layout_with_llm(
                 }
             )
 
-        repair_response = client.chat.completions.create(
-            model=model,
-            messages=repair_messages,
-        )
+        with track_api_call(
+            "text",
+            "composite_scene_layout_repair_prompt_builder",
+            {"model": model},
+        ):
+            repair_response = client.chat.completions.create(
+                model=model,
+                messages=repair_messages,
+            )
         repaired_layout_text = repair_response.choices[0].message.content
         if not repaired_layout_text:
             raise ValueError("The LLM did not return a repaired scene layout.")

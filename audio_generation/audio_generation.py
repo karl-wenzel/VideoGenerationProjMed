@@ -4,6 +4,8 @@ import edge_tts
 from pydub import AudioSegment
 import os
 
+from pipeline_timing import track_api_call_async
+
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 BGM_DIR = os.path.dirname(os.path.abspath(__file__))  # ./audio_generation/
 
@@ -137,7 +139,18 @@ async def generate_scene_audio(scene, scene_id):
     )
 
     #generate narration audio
-    await communicate.save(voice_output)
+    async with track_api_call_async(
+        "audio",
+        "edge_tts_scene_narration",
+        {
+            "scene_id": scene_id,
+            "voice": NARRATOR_VOICE,
+            "mood": mood,
+            "rate": style["rate"],
+            "pitch": style["pitch"],
+        },
+    ):
+        await communicate.save(voice_output)
 
     
     #add background music

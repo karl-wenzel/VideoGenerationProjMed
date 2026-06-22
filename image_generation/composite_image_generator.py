@@ -60,6 +60,13 @@ RETRYABLE_IMAGE_STATUS_CODES = {409, 429, 500, 502, 503, 504}
 RETRYABLE_IMAGE_ERROR_TERMS = (
     "rate limit",
     "too many requests",
+    "timed out",
+    "read timeout",
+    "connection timeout",
+    "connection aborted",
+    "connection reset",
+    "remote disconnected",
+    "temporarily unavailable",
     "parallel",
     "concurrency",
     "concurrent",
@@ -77,6 +84,9 @@ class ApiCallCoordinator:
         self.semaphore = threading.BoundedSemaphore(
             normalize_worker_count(options.max_api_workers)
         )
+        self._image_start_lock = threading.Lock()
+        self._next_image_api_start = 0.0
+        self._image_api_cooldown_until = 0.0
 
     def run_llm_call(self, operation: Callable[[], Any]) -> Any:
         """Run a non-retried LLM call under the shared API concurrency cap."""
@@ -95,15 +105,51 @@ class ApiCallCoordinator:
         while True:
             try:
                 with self.semaphore:
+                    self.wait_for_image_api_turn()
                     return operation()
             except Exception as error:
+                retryable = is_retryable_image_generation_error(error)
                 if (
                     attempt > self.options.max_retries
-                    or not is_retryable_image_generation_error(error)
+                    or not retryable
                 ):
+                    prompt_log.append(
+                        {
+                            "api_call": "image_generation_failed",
+                            "failed_api_call": api_call,
+                            "attempt": attempt,
+                            "max_retries": self.options.max_retries,
+                            "retryable": retryable,
+                            "error": describe_image_generation_error(error),
+                        }
+                    )
+                    if VERBOSE:
+                        print(
+                            "Image API call failed after retries: "
+                            f"{api_call} attempt {attempt}. "
+                            f"{describe_image_generation_error(error)}"
+                    )
                     raise
 
                 delay_seconds = calculate_retry_delay(self.options, attempt)
+                cooldown_seconds = 0.0
+                if is_rate_limit_error(error):
+                    cooldown_seconds = calculate_rate_limit_cooldown(
+                        self.options,
+                        error,
+                    )
+                    self.queue_image_api_cooldown(cooldown_seconds)
+                    delay_seconds = max(
+                        delay_seconds,
+                        cooldown_seconds
+                        + random.uniform(
+                            0.0,
+                            max(
+                                0.0,
+                                float(self.options.rate_limit_retry_jitter_seconds),
+                            ),
+                        ),
+                    )
                 # Parallel image jobs can be rejected by the remote service; retry
                 # only those targeted limit failures instead of hiding real errors.
                 prompt_log.append(
@@ -113,16 +159,52 @@ class ApiCallCoordinator:
                         "attempt": attempt,
                         "next_attempt": attempt + 1,
                         "delay_seconds": round(delay_seconds, 3),
-                        "error": str(error),
+                        "cooldown_seconds": round(cooldown_seconds, 3),
+                        "error": describe_image_generation_error(error),
                     }
                 )
                 if VERBOSE:
+                    cooldown_text = (
+                        f" Shared cooldown {cooldown_seconds:.1f}s."
+                        if cooldown_seconds > 0
+                        else ""
+                    )
                     print(
-                        "Retrying image API call after parallel/rate limit: "
-                        f"{api_call} attempt {attempt + 1}"
+                        "Retrying image API call after retryable failure: "
+                        f"{api_call} attempt {attempt + 1} "
+                        f"in {delay_seconds:.1f}s. "
+                        f"{describe_image_generation_error(error)}"
+                        f"{cooldown_text}"
                     )
                 time.sleep(delay_seconds)
                 attempt += 1
+
+    def wait_for_image_api_turn(self) -> None:
+        """Stagger image API starts and honor shared rate-limit cooldowns."""
+        stagger_seconds = max(0.0, float(self.options.api_start_stagger_seconds))
+        with self._image_start_lock:
+            now = time.perf_counter()
+            scheduled_start = max(
+                now,
+                self._next_image_api_start,
+                self._image_api_cooldown_until,
+            )
+            self._next_image_api_start = scheduled_start + stagger_seconds
+            wait_seconds = scheduled_start - now
+
+        if wait_seconds > 0:
+            time.sleep(wait_seconds)
+
+    def queue_image_api_cooldown(self, cooldown_seconds: float) -> None:
+        """Make subsequent image workers wait after the API reports rate limits."""
+        if cooldown_seconds <= 0:
+            return
+
+        with self._image_start_lock:
+            self._image_api_cooldown_until = max(
+                self._image_api_cooldown_until,
+                time.perf_counter() + cooldown_seconds,
+            )
 
 
 def normalize_worker_count(value: int) -> int:
@@ -142,9 +224,25 @@ def calculate_retry_delay(
     return min(max_delay, exponential_delay + jitter)
 
 
+def calculate_rate_limit_cooldown(
+    options: CompositeGenerationOptions,
+    error: Exception,
+) -> float:
+    """Calculate a shared cooldown after a rate-limit response."""
+    configured_cooldown = max(0.0, float(options.rate_limit_cooldown_seconds))
+    retry_after_seconds = get_retry_after_seconds(error)
+    if retry_after_seconds is None:
+        return configured_cooldown
+
+    return max(configured_cooldown, retry_after_seconds)
+
+
 def is_retryable_image_generation_error(error: Exception) -> bool:
     """Detect API errors caused by remote rate/concurrency/parallel limits."""
     response = getattr(error, "response", None)
+    if isinstance(error, requests.RequestException) and response is None:
+        return True
+
     status_code = getattr(response, "status_code", None)
     if status_code in RETRYABLE_IMAGE_STATUS_CODES:
         return True
@@ -158,6 +256,46 @@ def is_retryable_image_generation_error(error: Exception) -> bool:
 
     error_text = " ".join(error_text_parts)
     return any(term in error_text for term in RETRYABLE_IMAGE_ERROR_TERMS)
+
+
+def is_rate_limit_error(error: Exception) -> bool:
+    """Return True when the remote API explicitly reports rate limiting."""
+    response = getattr(error, "response", None)
+    status_code = getattr(response, "status_code", None)
+    if status_code == 429:
+        return True
+
+    return "rate limit" in str(error).lower() or "too many requests" in str(error).lower()
+
+
+def get_retry_after_seconds(error: Exception) -> float | None:
+    """Parse a numeric Retry-After header from an HTTP error when present."""
+    response = getattr(error, "response", None)
+    headers = getattr(response, "headers", None)
+    if not headers:
+        return None
+
+    retry_after = headers.get("Retry-After") or headers.get("retry-after")
+    if retry_after is None:
+        return None
+
+    try:
+        return max(0.0, float(retry_after))
+    except (TypeError, ValueError):
+        return None
+
+
+def describe_image_generation_error(error: Exception) -> str:
+    """Return an HTTP error description with response details when available."""
+    response = getattr(error, "response", None)
+    status_code = getattr(response, "status_code", None)
+    detail_parts = [str(error)]
+    if status_code is not None:
+        detail_parts.append(f"status_code={status_code}")
+    response_text = getattr(response, "text", None)
+    if response_text:
+        detail_parts.append(f"response={response_text[:500]}")
+    return " | ".join(detail_parts)
 
 
 def generate_composite_scene_images(

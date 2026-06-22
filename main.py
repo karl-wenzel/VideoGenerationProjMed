@@ -33,6 +33,7 @@ from image_generation.image_scene_generator import (                  # step 2
 from audio_generation.audio_generation import generate_scene_audio    # step 3
 
 from video_generation.video_generation import create_story_video      # step 4
+from pipeline_timing import reset_api_timeline, save_api_timeline
 
 # ---------------------------------------------------------------------------
 # Shared paths (mirrors the defaults used in each sub-module)
@@ -106,10 +107,20 @@ def generate_video() -> None:
 # ---------------------------------------------------------------------------
 
 async def run_pipeline(user_prompt: str) -> None:
-    story  = generate_story_json(user_prompt)
-    generate_images()
-    await generate_audio(story)
-    generate_video()
+    reset_api_timeline()
+    try:
+        story  = generate_story_json(user_prompt)
+        generate_images()
+        await generate_audio(story)
+        generate_video()
+    finally:
+        timeline_json_path, timeline_svg_path = save_api_timeline(
+            TMP_DIR / "api_timeline.json",
+            TMP_DIR / "api_timeline.svg",
+        )
+        print(f"\nAPI timeline JSON saved to: {timeline_json_path}")
+        print(f"API timeline diagram saved to: {timeline_svg_path}")
+
     print("\n✅  Pipeline complete!")
 
 

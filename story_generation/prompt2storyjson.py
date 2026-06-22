@@ -4,6 +4,8 @@ from pathlib import Path
 from dotenv import load_dotenv
 from openai import OpenAI
 
+from pipeline_timing import track_api_call
+
 load_dotenv()
 
 client = OpenAI(
@@ -93,22 +95,28 @@ Important:
 
 
 def generate_story(user_prompt: str) -> dict:
-    response = client.chat.completions.create(
-        model="openai-gpt-oss-120b",
-        messages=[
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt}
-        ],
-        response_format={
-            "type": "json_schema",
-            "json_schema": {
-                "name": "children_story_slideshow",
-                "strict": True,
-                "schema": story_schema
-            }
-        },
-        temperature=0.8
-    )
+    model = "openai-gpt-oss-120b"
+    with track_api_call(
+        "text",
+        "story_json_generation",
+        {"model": model},
+    ):
+        response = client.chat.completions.create(
+            model=model,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt}
+            ],
+            response_format={
+                "type": "json_schema",
+                "json_schema": {
+                    "name": "children_story_slideshow",
+                    "strict": True,
+                    "schema": story_schema
+                }
+            },
+            temperature=0.8
+        )
 
     content = response.choices[0].message.content
     story_data = json.loads(content)

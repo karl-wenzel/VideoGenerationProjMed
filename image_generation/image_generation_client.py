@@ -7,6 +7,8 @@ from typing import Any, Final
 
 import requests
 
+from pipeline_timing import track_api_call
+
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_INPUT_PATH = PROJECT_ROOT / "tmp" / "story.json"
@@ -114,13 +116,18 @@ def generate_image_b64(
         print("role: image_generation")
         print(f"prompt: {prompt}")
 
-    response = requests.post(
-        IMAGE_GENERATION_URL,
-        headers=headers,
-        json=payload,
-        timeout=timeout_seconds,
-    )
-    response.raise_for_status()
+    with track_api_call(
+        "image",
+        "flux_image_generation",
+        {"model": model, "size": size},
+    ):
+        response = requests.post(
+            IMAGE_GENERATION_URL,
+            headers=headers,
+            json=payload,
+            timeout=timeout_seconds,
+        )
+        response.raise_for_status()
 
     response_json = response.json()
     data = response_json.get("data")
@@ -184,7 +191,7 @@ def generate_scene_image_with_qwen(
     *,
     mask_image_path: str | Path | None = None,
     api_key: str | None = None,
-    timeout_seconds: int = 180,
+    timeout_seconds: int = 300,
 ) -> None:
     """Generate one scene image with Qwen image edit."""
     load_env_file_if_available()
@@ -227,12 +234,21 @@ def generate_scene_image_with_qwen(
                 "image/png",
             )
 
-        response = requests.post(
-            IMAGE_EDIT_URL,
-            headers=headers,
-            files=files,
-            timeout=timeout_seconds,
-        )
+        with track_api_call(
+            "image",
+            "qwen_image_edit",
+            {
+                "inference_service": QWEN_IMAGE_EDIT_INFERENCE_SERVICE,
+                "input_image": str(input_image_path),
+                "has_mask": mask_image_path is not None,
+            },
+        ):
+            response = requests.post(
+                IMAGE_EDIT_URL,
+                headers=headers,
+                files=files,
+                timeout=timeout_seconds,
+            )
+            response.raise_for_status()
 
-    response.raise_for_status()
     save_image_edit_response(response, output_path)
