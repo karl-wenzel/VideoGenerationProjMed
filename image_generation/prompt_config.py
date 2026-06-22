@@ -21,7 +21,7 @@ QWEN_COMPOSITE_SCENE_CHARACTER_MASK_EROSION_PIXELS = 3
 
 COMPOSITE_IMAGE_STYLE_PROMPT = (
     "Style: warm children's illustration, vivid colors, gentle natural light, "
-    "soft painterly textures, brushstrokes, expressive but friendly subjects, "
+    "soft painterly textures, brushstrokes, expressive, friendly subjects, "
     "coherent composition. Painted, happy style."
 )
 
@@ -52,11 +52,11 @@ LLM_COMPOSITE_LAYOUT_SYSTEM_MESSAGE = (
     "carrying, or resting. Include facing direction, gesture, "
     "expression, limb positions, and held objects. Keep "
     "pose_prompt limited to the isolated character body, clothing, "
-    "held objects, expression, and action. Put all location, "
-    "surface, scenery, lighting, weather, props that are not held, "
+    "held objects, expression, and action. Dont mention more than one character in a pose_prompt. Put all location, "
+    "surface, scenery, lighting, weather, props that are not held, secondary characters "
     "and environment details in background_prompt instead. Use "
-    "visual traits, not proper names. Image prompts should use "
-    "positive visual phrasing only."
+    "visual traits, dont mention proper names. Describe objectively and visually. Generated images "
+    "must be suitable for children."
 )
 
 LLM_COMPOSITE_LAYOUT_USER_PREFIX = (
@@ -127,7 +127,7 @@ COMPOSITE_POSE_CLARITY_PROMPT_LINES = (
     "Render a character-only studio layer.",
     "Show the scene activity through body posture, gesture, and expression.",
     "Keep the pose as an isolated subject layer for later compositing.",
-    "Do not render scenery, landscape, ground, floor, sky, weather, lighting effects, shadows, or environmental props.",
+    "Do not render scenery, landscape, ground, floor, grass, secondary characters, sky, weather, lighting effects, shadows, or environmental props.",
     "Only include objects physically held or worn by the character.",
 )
 
