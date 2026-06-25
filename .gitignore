@@ -10,3 +10,4 @@ audio_generation/__pycache__/
 story_generation/__pycache__/
 video_generation/__pycache__/
 tmp/
+video_history/
