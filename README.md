@@ -131,6 +131,9 @@ Each scene is narrated using the `en-GB-RyanNeural` voice via `edge-tts`. The mo
 ### 4. Video Generation
 Scene images and their corresponding audio tracks are combined in order using `moviepy`. Each scene lasts for the duration of its audio plus a 1-second pause. The final video is exported as `tmp/final_story.mp4`.
 
+### 5. GUI
+If you want to start the GUI you have to execute the 'start_pipeline.command'. This script acts as an automated shortcut that navigates to the project folder, activates the necessary Conda environment, and launches the application. You need this code because it allows anyone to start the software with a single click, completely removing the need to manually type complex commands into the terminal.
+
 ---
 
 ## Notes
