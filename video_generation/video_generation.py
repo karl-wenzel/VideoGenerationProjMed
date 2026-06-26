@@ -59,6 +59,7 @@ def create_story_video(image_folder, audio_folder, output_name):
     audios = sorted([f for f in os.listdir(audio_folder) if f.endswith('.mp3')])
     
     project_root = Path(__file__).resolve().parent.parent
+    font_path = project_root / "fonts" / "DejaVuSans.ttf"
     story_path = project_root / "tmp" / "story.json"
 
     with open(story_path, "r", encoding="utf-8") as f:
@@ -99,18 +100,12 @@ def create_story_video(image_folder, audio_folder, output_name):
         subtitle_clips = []
 
         for part, start_time, duration in subtitle_timings:
-            part = (
-                part.replace("-", "-")
-                    .replace("–", "-")
-                    .replace("—", "-")
-                    .replace("‐", "-")
-            )
             wrapped_text = "\n".join(textwrap.wrap(part, width=50))
 
             subtitle_clip = (
                 TextClip(
                     text=wrapped_text,
-                    font="/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+                    font=str(font_path),
                     font_size=30,
                     color="white",
                     stroke_color="black",
@@ -120,7 +115,7 @@ def create_story_video(image_folder, audio_folder, output_name):
                 )
                 .with_start(start_time)
                 .with_duration(duration)
-                .with_position(("center", img_clip.h-190))
+                .with_position(("center", img_clip.h-180))
             )
 
             subtitle_clips.append(subtitle_clip)
