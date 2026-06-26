@@ -1,6 +1,7 @@
 import asyncio
 import json
 import edge_tts
+import re
 from pydub import AudioSegment
 import os
 
@@ -150,7 +151,40 @@ async def generate_scene_audio(scene, scene_id):
             "pitch": style["pitch"],
         },
     ):
-        await communicate.save(voice_output)
+        subtitle_dir = os.path.join(BASE_DIR, "tmp", "tmp_audio_generation", "subtitles")
+        os.makedirs(subtitle_dir, exist_ok=True)
+
+        subtitle_output = os.path.join(subtitle_dir, f"scene_{scene_id}_words.json")
+
+        word_boundaries = []
+        audio_bytes = bytearray()
+
+        async for chunk in communicate.stream():
+            print(chunk["type"])
+            if chunk["type"] == "audio":
+                audio_bytes.extend(chunk["data"])
+
+            elif chunk["type"] == "SentenceBoundary":
+                word_boundaries.append({
+                    "text": chunk["text"],
+                    "start": chunk["offset"] / 10_000_000,
+                    "duration": chunk["duration"] / 10_000_000,
+                })
+
+        with open(voice_output, "wb") as f:
+            f.write(audio_bytes)
+
+        with open(subtitle_output, "w", encoding="utf-8") as f:
+            json.dump(
+                {
+                    "scene_id": scene_id,
+                    "full_text": text,
+                    "words": word_boundaries,
+                },
+                f,
+                indent=2,
+                ensure_ascii=False,
+            )
 
     
     #add background music
@@ -261,3 +295,4 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
