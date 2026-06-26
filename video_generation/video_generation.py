@@ -110,6 +110,7 @@ def create_story_video(image_folder, audio_folder, output_name):
             subtitle_clip = (
                 TextClip(
                     text=wrapped_text,
+                    font="/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
                     font_size=30,
                     color="white",
                     stroke_color="black",
