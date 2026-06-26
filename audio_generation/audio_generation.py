@@ -160,7 +160,6 @@ async def generate_scene_audio(scene, scene_id):
         audio_bytes = bytearray()
 
         async for chunk in communicate.stream():
-            print(chunk["type"])
             if chunk["type"] == "audio":
                 audio_bytes.extend(chunk["data"])
 
