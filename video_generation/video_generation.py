@@ -1,5 +1,51 @@
 import os
-from moviepy import ImageClip, AudioFileClip, concatenate_videoclips
+import json
+import re
+import textwrap
+from pathlib import Path
+from moviepy import ImageClip, AudioFileClip, TextClip, CompositeVideoClip, concatenate_videoclips
+
+
+def get_scene_subtitle_text(scene):
+    return scene.get("narration") or (
+        scene.get("first_sentence", "") + " " +
+        scene.get("summary", "") + " " +
+        scene.get("last_sentence", "")
+    )
+
+
+def split_subtitle_sentences(text):
+    text = " ".join(text.split())
+    parts = re.split(r'(?<=[.!?。！？])\s+', text)
+    parts = [part.strip() for part in parts if part.strip()]
+
+    final_parts = []
+    for part in parts:
+        if len(part) > 120:
+            smaller = re.split(r'(?<=[,，;；:：])\s+', part)
+            final_parts.extend([p.strip() for p in smaller if p.strip()])
+        else:
+            final_parts.append(part)
+
+    return final_parts or [text]
+
+
+def normalize_word(word):
+    return re.sub(r"[^a-zA-Z0-9]", "", word).lower()
+
+def create_precise_subtitle_timings(word_data):
+    subtitle_timings = []
+
+    for item in word_data["words"]:
+        subtitle_timings.append(
+            (
+                item["text"],
+                item["start"],
+                item["duration"]
+            )
+        )
+
+    return subtitle_timings
 
 def create_story_video(image_folder, audio_folder, output_name):
     
@@ -11,6 +57,15 @@ def create_story_video(image_folder, audio_folder, output_name):
     # Listen für alle Bilder und Audios holen 
     images = sorted([f for f in os.listdir(image_folder) if f.endswith(('.png', '.jpg'))])
     audios = sorted([f for f in os.listdir(audio_folder) if f.endswith('.mp3')])
+    
+    project_root = Path(__file__).resolve().parent.parent
+    story_path = project_root / "tmp" / "story.json"
+
+    with open(story_path, "r", encoding="utf-8") as f:
+        story = json.load(f)
+
+    scenes = story.get("scenes", [])
+    subtitle_folder = project_root / "tmp" / "tmp_audio_generation" / "subtitles"
 
     clips = []
 
@@ -19,16 +74,60 @@ def create_story_video(image_folder, audio_folder, output_name):
         img_path = os.path.join(image_folder, images[i])
         audio_path = os.path.join(audio_folder, audios[i])
 
-        # 1. Audio laden
         audio_clip = AudioFileClip(audio_path)
-        
-        # 2. Bild laden und die Länge des Audios zuweisen
+
         img_clip = ImageClip(img_path).with_duration(audio_clip.duration)
-        
-        # 3. Audio an das frisch geladene Bild heften
-        img_clip = img_clip.with_audio(audio_clip)
-        
-        clips.append(img_clip)
+
+        scene = scenes[i] if i < len(scenes) else {}
+        subtitle_text = get_scene_subtitle_text(scene)
+
+        subtitle_json_path = subtitle_folder / f"scene_{i + 1}_words.json"
+
+        if subtitle_json_path.exists():
+            with open(subtitle_json_path, "r", encoding="utf-8") as f:
+                word_data = json.load(f)
+
+            subtitle_timings = create_precise_subtitle_timings(word_data)
+        else:
+            subtitle_parts = split_subtitle_sentences(subtitle_text)
+            part_duration = audio_clip.duration / max(1, len(subtitle_parts))
+            subtitle_timings = [
+                (part, index * part_duration, part_duration)
+                for index, part in enumerate(subtitle_parts)
+            ]
+
+        subtitle_clips = []
+
+        for part, start_time, duration in subtitle_timings:
+            part = (
+                part.replace("-", "-")
+                    .replace("–", "-")
+                    .replace("—", "-")
+                    .replace("‐", "-")
+            )
+            wrapped_text = "\n".join(textwrap.wrap(part, width=50))
+
+            subtitle_clip = (
+                TextClip(
+                    text=wrapped_text,
+                    font_size=30,
+                    color="white",
+                    stroke_color="black",
+                    stroke_width=2,
+                    method="caption",
+                    size=(int(img_clip.w * 0.82), 140),
+                )
+                .with_start(start_time)
+                .with_duration(duration)
+                .with_position(("center", img_clip.h-190))
+            )
+
+            subtitle_clips.append(subtitle_clip)
+
+        scene_clip = CompositeVideoClip([img_clip, *subtitle_clips])
+        scene_clip = scene_clip.with_audio(audio_clip)
+
+        clips.append(scene_clip)
 
     # Alle Szenen hintereinander hängen
     if clips:
