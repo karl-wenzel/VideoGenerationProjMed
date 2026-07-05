@@ -11,7 +11,7 @@ from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QH
                              QLabel, QTextEdit, QPushButton, QProgressBar, QListWidget,
                              QListWidgetItem, QMessageBox, QStyle)
 from PyQt6.QtCore import QThread, pyqtSignal, Qt, QTimer
-from PyQt6.QtGui import QFont
+from PyQt6.QtGui import QFont, QPainter, QColor
 
 from main import main as run_ai_pipeline
 from main import VIDEO_OUTPUT
@@ -26,53 +26,89 @@ if not HISTORY_FILE.exists():
 
 
 # ==========================================
-# 1. History-Leiste
+# 1. Custom Widgets
 # ==========================================
+
+class MovingTextProgressBar(QProgressBar):
+    def __init__(self):
+        super().__init__()
+        self.setTextVisible(False)
+
+    def paintEvent(self, event):
+        super().paintEvent(event)
+
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+
+        font = self.font()
+        font.setBold(True)
+        painter.setFont(font)
+        painter.setPen(QColor("#11111b"))
+
+        text = f"{self.value()}%"
+        fm = painter.fontMetrics()
+        text_width = fm.horizontalAdvance(text)
+
+        fraction = self.value() / (self.maximum() or 100)
+        chunk_width = int(self.width() * fraction)
+
+        x_pos = (chunk_width // 2) - (text_width // 2)
+
+        if x_pos < 10:
+            x_pos = 10
+
+        y_pos = (self.height() + fm.ascent() - fm.descent()) // 2
+
+        painter.drawText(x_pos, y_pos, text)
+
+
 class HistoryItemWidget(QWidget):
-    def __init__(self, prompt, timestamp, video_path, list_item, parent_gui):
+    def __init__(self, prompt, timestamp, duration, video_path, list_item, parent_gui):
         super().__init__()
         self.list_item = list_item
         self.video_path = video_path
         self.parent_gui = parent_gui
 
         layout = QVBoxLayout()
-        layout.setContentsMargins(5, 5, 5, 5)
+        # --- FIX: Rechter Abstand verkleinert (von 5 auf 2), damit der Button weiter nach rechts geht ---
+        layout.setContentsMargins(10, 8, 2, 8)
         layout.setSpacing(5)
 
-        # Obere Reihe: Zeit und Löschen-Button
+        # Obere Reihe: Zeit, Dauer und Löschen-Button
         top_layout = QHBoxLayout()
 
-        self.time_label = QLabel(f"🕒 {timestamp}")
+        self.time_label = QLabel(f"🕒 {timestamp}   |   ⏳ Taken: {duration}")
         self.time_label.setStyleSheet("color: #a6adc8; font-size: 11px;")
         top_layout.addWidget(self.time_label)
 
         top_layout.addStretch()
 
-        # --- DER SYSTEM-MÜLLEIMER ---
         self.delete_btn = QPushButton()
         trash_icon = self.style().standardIcon(QStyle.StandardPixmap.SP_TrashIcon)
         self.delete_btn.setIcon(trash_icon)
-
         self.delete_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self.delete_btn.setFixedSize(30, 30)
         self.delete_btn.setToolTip("Delete Session")
         self.delete_btn.setStyleSheet("""
-            QPushButton { 
-                background-color: #45475a; 
-                border-radius: 15px; 
-            }
-            QPushButton:hover { 
-                background-color: #f38ba8; /* Rote Warnfarbe */
-            }
+            QPushButton { background-color: #45475a; border-radius: 15px; }
+            QPushButton:hover { background-color: #f38ba8; }
         """)
         self.delete_btn.clicked.connect(self.delete_self)
         top_layout.addWidget(self.delete_btn)
 
         layout.addLayout(top_layout)
 
-        # Untere Reihe: Der volle Prompt
-        self.prompt_label = QLabel(f"🎬 {prompt}")
+        # --- FIX: Text abschneiden und "..." hinzufügen ---
+        display_prompt = prompt
+        if len(display_prompt) > 120:
+            display_prompt = display_prompt[:117] + "..."
+
+        self.prompt_label = QLabel(f"🎬 {display_prompt}")
         self.prompt_label.setWordWrap(True)
+
+        # PROFI-FEATURE: Wenn der Text abgeschnitten ist, zeigt Hovering den kompletten Text!
+        self.prompt_label.setToolTip(prompt)
+
         self.prompt_label.setStyleSheet("color: #cdd6f4; font-size: 13px; font-weight: bold;")
         layout.addWidget(self.prompt_label)
 
@@ -134,7 +170,6 @@ class PipelineWorker(QThread):
 
 
 class DemoWorker(QThread):
-    """Simuliert in 10 Sekunden eine komplette Pipeline für UI-Tests"""
     finished_signal = pyqtSignal()
     error_signal = pyqtSignal(str)
     target_progress_signal = pyqtSignal(int)
@@ -172,7 +207,6 @@ class MainWindow(QMainWindow):
         self.setMinimumSize(1000, 600)
         self.showMaximized()
 
-        # --- Design ---
         self.setStyleSheet("""
             QMainWindow { background-color: #1e1e2e; } 
             QLabel { color: #cdd6f4; font-family: 'Segoe UI', sans-serif; }
@@ -194,7 +228,6 @@ class MainWindow(QMainWindow):
 
             QProgressBar {
                 border: 2px solid #45475a; border-radius: 10px;
-                text-align: center; color: #11111b; 
                 background-color: #313244; height: 25px;
                 font-weight: bold; font-size: 13px;
             }
@@ -213,20 +246,21 @@ class MainWindow(QMainWindow):
         main_layout.setSpacing(20)
         main_layout.setContentsMargins(30, 30, 30, 30)
 
-        # --- LINKE SEITE (History) ---
+        # --- LINKE SEITE ---
         sidebar_layout = QVBoxLayout()
         self.history_title = QLabel("📚 Session History")
         self.history_title.setFont(QFont("Segoe UI", 16, QFont.Weight.Bold))
         sidebar_layout.addWidget(self.history_title)
 
         self.history_list = QListWidget()
-        self.history_list.setFixedWidth(320)
+        self.history_list.setFixedWidth(350)
+        self.history_list.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.history_list.itemDoubleClicked.connect(self.play_history_video)
         sidebar_layout.addWidget(self.history_list)
 
         main_layout.addLayout(sidebar_layout)
 
-        # --- RECHTE SEITE (Generator) ---
+        # --- RECHTE SEITE ---
         content_layout = QVBoxLayout()
         content_layout.setSpacing(15)
 
@@ -243,12 +277,12 @@ class MainWindow(QMainWindow):
         self.start_button.clicked.connect(self.start_generation)
         content_layout.addWidget(self.start_button)
 
-        self.progress_bar = QProgressBar()
+        self.progress_bar = MovingTextProgressBar()
         self.progress_bar.setRange(0, 100)
         self.progress_bar.hide()
         content_layout.addWidget(self.progress_bar)
 
-        # --- ZEIT & STATUS BEREICH ---
+        # --- ZEIT & STATUS ---
         status_layout = QHBoxLayout()
         self.status_label = QLabel("Status: Ready")
         self.status_label.setStyleSheet("font-size: 14px; font-weight: bold;")
@@ -267,7 +301,6 @@ class MainWindow(QMainWindow):
         container.setLayout(main_layout)
         self.setCentralWidget(container)
 
-        # --- HOCHFREQUENZ TIMER SETUP ---
         self.ui_timer = QTimer()
         self.ui_timer.timeout.connect(self.ui_tick)
         self.elapsed_ticks = 0
@@ -280,7 +313,6 @@ class MainWindow(QMainWindow):
     # 4. Timer & Progress Logik
     # ==========================================
     def ui_tick(self):
-        """Wird alle 100ms aufgerufen. Sorgt für flüssige Animationen."""
         self.elapsed_ticks += 1
 
         if self.elapsed_ticks % 10 == 0:
@@ -288,17 +320,20 @@ class MainWindow(QMainWindow):
             mins, secs = divmod(seconds, 60)
             self.time_label.setText(f"⏱️ Time: {mins:02d}:{secs:02d} | ETA: {self.current_eta}")
 
+        if self.current_prompt.upper() != "DEMO":
+            if self.elapsed_ticks % 40 == 0 and self.target_progress < 95:
+                self.target_progress += 1
+
         current = self.progress_bar.value()
         if current < self.target_progress:
-            gap = self.target_progress - current
-            step = max(1, gap // 3)
-            self.progress_bar.setValue(current + step)
+            self.progress_bar.setValue(current + 1)
 
     def set_target_progress(self, target):
-        self.target_progress = target
+        if target > self.target_progress:
+            self.target_progress = target
 
     # ==========================================
-    # 5. History Logik (Mit Custom Widgets)
+    # 5. History Logik
     # ==========================================
     def load_history(self):
         self.history_list.clear()
@@ -307,20 +342,25 @@ class MainWindow(QMainWindow):
                 history = json.load(f)
                 for entry in reversed(history):
                     t_stamp = entry.get("timestamp", "Unknown time")
-                    self.add_to_sidebar(entry["prompt"], t_stamp, entry["video_path"])
+                    duration = entry.get("duration", "??:?? min")
+                    self.add_to_sidebar(entry["prompt"], t_stamp, duration, entry["video_path"])
         except Exception:
             pass
 
-    def add_to_sidebar(self, prompt, timestamp, video_path):
+    def add_to_sidebar(self, prompt, timestamp, duration, video_path):
         item = QListWidgetItem(self.history_list)
-        widget = HistoryItemWidget(prompt, timestamp, video_path, item, self)
+        widget = HistoryItemWidget(prompt, timestamp, duration, video_path, item, self)
+
+        # --- FIX: Das Element ist jetzt genau so breit, dass der Button an den Rand gedrückt wird ---
+        widget.setFixedWidth(335)
+
         item.setSizeHint(widget.sizeHint())
         item.setData(Qt.ItemDataRole.UserRole, video_path)
 
         self.history_list.addItem(item)
         self.history_list.setItemWidget(item, widget)
 
-    def save_to_history(self, prompt):
+    def save_to_history(self, prompt, duration_str):
         now = datetime.now()
         timestamp_file = now.strftime("%Y%m%d_%H%M%S")
         timestamp_ui = now.strftime("%d.%m.%Y - %H:%M")
@@ -340,6 +380,7 @@ class MainWindow(QMainWindow):
         history.append({
             "prompt": prompt,
             "timestamp": timestamp_ui,
+            "duration": duration_str,
             "video_path": str(new_video_path)
         })
         with open(HISTORY_FILE, "w", encoding="utf-8") as f:
@@ -403,10 +444,14 @@ class MainWindow(QMainWindow):
         self.progress_bar.setValue(100)
         self.status_label.setText(f"Status: ✅ Done! Video saved.")
 
+        seconds = self.elapsed_ticks // 10
+        mins, secs = divmod(seconds, 60)
+        final_duration_str = f"{mins:02d}:{secs:02d} min"
+
         if self.current_prompt.upper() != "DEMO":
-            self.save_to_history(self.current_prompt)
+            self.save_to_history(self.current_prompt, final_duration_str)
         else:
-            self.save_to_history("🎭 Demo Simulation run")
+            self.save_to_history("🎭 Demo Simulation run", final_duration_str)
 
         QTimer.singleShot(4000, self.hide_progress_bar)
 
