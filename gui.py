@@ -25,6 +25,19 @@ if not HISTORY_FILE.exists():
         json.dump([], f)
 
 
+def open_video_file(video_path):
+    path = str(video_path)
+
+    # Windows has no "open" command; use the file association shell hook so
+    # generated MP4s open in the user's default video player.
+    if sys.platform.startswith("win"):
+        os.startfile(path)
+    elif sys.platform == "darwin":
+        subprocess.call(["open", path])
+    else:
+        subprocess.call(["xdg-open", path])
+
+
 # ==========================================
 # 1. Custom Widgets
 # ==========================================
@@ -408,7 +421,7 @@ class MainWindow(QMainWindow):
 
     def play_history_video(self, item):
         path = item.data(Qt.ItemDataRole.UserRole)
-        if os.path.exists(path): subprocess.call(['open', path])
+        if os.path.exists(path): open_video_file(path)
 
     # ==========================================
     # 6. Generator Logik
@@ -456,7 +469,7 @@ class MainWindow(QMainWindow):
         QTimer.singleShot(4000, self.hide_progress_bar)
 
         try:
-            subprocess.call(['open', str(VIDEO_OUTPUT)])
+            open_video_file(VIDEO_OUTPUT)
         except:
             pass
 
