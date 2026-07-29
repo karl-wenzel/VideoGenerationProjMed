@@ -50,11 +50,13 @@ story_schema = {
                 "properties": {
                     "summary": {"type": "string"},
                     "first_sentence": {"type": "string"},
+                    "narration": {"type": "string"},
                     "last_sentence": {"type": "string"}
                 },
                 "required": [
                     "summary",
                     "first_sentence",
+                    "narration",
                     "last_sentence"
                 ],
                 "additionalProperties": False
@@ -80,7 +82,16 @@ Requirements:
 - Each scene must include:
   - a short summary,
   - a strong first sentence,
+  - a complete narration,
   - a satisfying last sentence.
+- The narration must contain the complete story content of the scene.
+- Write approximately 60 to 100 words for each narration.
+- The narration should include actions, descriptions, emotions, and dialogue
+  when appropriate.
+- The narration must not be only a summary.
+- The first sentence and last sentence should not be repeated inside the narration.
+- The first sentence, narration, and last sentence must form one continuous,
+  natural scene when read together.
 - Character descriptions should be visually descriptive so they can be illustrated consistently.
 - Avoid violence, horror, or mature themes.
 - Use simple names unless the user asks otherwise.
