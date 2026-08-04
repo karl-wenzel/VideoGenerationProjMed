@@ -16,6 +16,9 @@ from PyQt6.QtGui import QFont, QPainter, QColor
 from main import main as run_ai_pipeline
 from main import VIDEO_OUTPUT
 
+# Speech-to-text worker lives in its own module.
+from speech_to_text import SpeechWorker
+
 # === ORDNER UND DATEI FÜR DEN VERLAUF ===
 HISTORY_DIR = Path("video_history")
 HISTORY_FILE = HISTORY_DIR / "history.json"
@@ -221,18 +224,18 @@ class MainWindow(QMainWindow):
         self.showMaximized()
 
         self.setStyleSheet("""
-            QMainWindow { background-color: #1e1e2e; } 
+            QMainWindow { background-color: #1e1e2e; }
             QLabel { color: #cdd6f4; font-family: 'Segoe UI', sans-serif; }
 
             QTextEdit {
                 background-color: #313244; color: #cdd6f4;
-                border: 2px solid #45475a; border-radius: 10px; 
+                border: 2px solid #45475a; border-radius: 10px;
                 padding: 12px; font-size: 15px;
             }
             QTextEdit:focus { border: 2px solid #89b4fa; }
 
             QPushButton {
-                background-color: #89b4fa; color: #11111b; 
+                background-color: #89b4fa; color: #11111b;
                 border-radius: 10px; padding: 15px;
                 font-size: 16px; font-weight: bold;
             }
@@ -285,10 +288,28 @@ class MainWindow(QMainWindow):
         self.prompt_input.setPlaceholderText("Once upon a time...")
         content_layout.addWidget(self.prompt_input)
 
+        # --- GENERATE-BUTTON MIT MIKROFON-BUTTON IN EINER REIHE ---
+        button_row = QHBoxLayout()
+        button_row.setSpacing(10)
+
         self.start_button = QPushButton("🚀 Generate Video")
         self.start_button.setCursor(Qt.CursorShape.PointingHandCursor)
         self.start_button.clicked.connect(self.start_generation)
-        content_layout.addWidget(self.start_button)
+        button_row.addWidget(self.start_button)
+
+        self.mic_button = QPushButton("🎤")
+        self.mic_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.mic_button.setFixedWidth(70)
+        self.mic_button.setToolTip("Click and speak to fill the prompt")
+        self.mic_button.setStyleSheet("""
+            QPushButton { background-color: #f9e2af; color: #11111b; font-size: 22px; }
+            QPushButton:hover { background-color: #f5c97a; }
+            QPushButton:disabled { background-color: #45475a; color: #a6adc8; }
+        """)
+        self.mic_button.clicked.connect(self.start_listening)
+        button_row.addWidget(self.mic_button)
+
+        content_layout.addLayout(button_row)
 
         self.progress_bar = MovingTextProgressBar()
         self.progress_bar.setRange(0, 100)
@@ -319,6 +340,8 @@ class MainWindow(QMainWindow):
         self.elapsed_ticks = 0
         self.target_progress = 0
         self.current_eta = "~08:00"
+
+        self.speech_worker = None
 
         self.load_history()
 
@@ -424,7 +447,42 @@ class MainWindow(QMainWindow):
         if os.path.exists(path): open_video_file(path)
 
     # ==========================================
-    # 6. Generator Logik
+    # 6. Speech-to-Text Logik
+    # ==========================================
+    def start_listening(self):
+        # Don't start a second recording while one is running.
+        if self.speech_worker is not None and self.speech_worker.isRunning():
+            return
+
+        self.mic_button.setEnabled(False)
+        self.mic_button.setText("…")
+
+        self.speech_worker = SpeechWorker()
+        self.speech_worker.listening_signal.connect(self.on_speech_listening)
+        self.speech_worker.result_signal.connect(self.on_speech_result)
+        self.speech_worker.error_signal.connect(self.on_speech_error)
+        self.speech_worker.start()
+
+    def on_speech_listening(self):
+        self.status_label.setStyleSheet("font-size: 14px; font-weight: bold;")
+        self.status_label.setText("Status: 🎤 Listening... speak now")
+
+    def on_speech_result(self, text):
+        existing = self.prompt_input.toPlainText().strip()
+        self.prompt_input.setPlainText(f"{existing} {text}".strip() if existing else text)
+        self.status_label.setText("Status: Ready")
+        self._reset_mic_button()
+
+    def on_speech_error(self, message):
+        self.status_label.setText(f"Status: 🎤 {message}")
+        self._reset_mic_button()
+
+    def _reset_mic_button(self):
+        self.mic_button.setEnabled(True)
+        self.mic_button.setText("🎤")
+
+    # ==========================================
+    # 7. Generator Logik
     # ==========================================
     def start_generation(self):
         self.current_prompt = self.prompt_input.toPlainText().strip()
