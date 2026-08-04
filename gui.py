@@ -9,7 +9,7 @@ from pathlib import Path
 
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
                              QLabel, QTextEdit, QPushButton, QProgressBar, QListWidget,
-                             QListWidgetItem, QMessageBox, QStyle)
+                             QListWidgetItem, QMessageBox, QStyle,QGridLayout,QButtonGroup,QRadioButton)
 from PyQt6.QtCore import QThread, pyqtSignal, Qt, QTimer
 from PyQt6.QtGui import QFont, QPainter, QColor
 
@@ -143,9 +143,10 @@ class PipelineWorker(QThread):
     target_progress_signal = pyqtSignal(int)
     step_signal = pyqtSignal(str)
 
-    def __init__(self, prompt):
+    def __init__(self, prompt, voice):
         super().__init__()
         self.prompt = prompt
+        self.voice = voice
 
     def run(self):
         class PrintInterceptor:
@@ -176,13 +177,17 @@ class PipelineWorker(QThread):
         sys.stdout = PrintInterceptor(self)
 
         try:
-            run_ai_pipeline(self.prompt)
+            run_ai_pipeline(
+                self.prompt,
+                self.voice
+            )
             self.target_progress_signal.emit(100)
             self.finished_signal.emit()
         except Exception as e:
             self.error_signal.emit(str(e))
         finally:
             sys.stdout = old_stdout
+
 
 
 class DemoWorker(QThread):
@@ -289,27 +294,120 @@ class MainWindow(QMainWindow):
         content_layout.addWidget(self.prompt_input)
 
         # --- GENERATE-BUTTON MIT MIKROFON-BUTTON IN EINER REIHE ---
-        button_row = QHBoxLayout()
-        button_row.setSpacing(10)
+        # ---------- Bottom Area ----------
+        bottom_layout = QHBoxLayout()
+        bottom_layout.setSpacing(15)
+        
+        # -------- Voice Selector --------
+        voice_layout = QVBoxLayout()
+        voice_layout.setSpacing(4)
+        
+        voice_label = QLabel("🎙 Narrator")
+        voice_label.setStyleSheet("""
+            color:#E8E8E8;
+            font-size:13px;
+            font-weight:bold;
+        """)
+        voice_layout.addWidget(voice_label)
+        
+        grid = QGridLayout()
+        grid.setHorizontalSpacing(20)
+        grid.setVerticalSpacing(4)
+        
+        self.voice_group = QButtonGroup(self)
+        
+        self.voice_jenny = QRadioButton("Jenny")
+        self.voice_ava = QRadioButton("Ava")
+        self.voice_aria = QRadioButton("Aria")
+        self.voice_ryan = QRadioButton("Ryan")
+        self.voice_guy = QRadioButton("Guy")
+        self.voice_sonia = QRadioButton("Sonia")
+        
+        buttons = [
+            self.voice_jenny,
+            self.voice_ava,
+            self.voice_aria,
+            self.voice_ryan,
+            self.voice_guy,
+            self.voice_sonia,
+        ]
+        
+        for b in buttons:
+            self.voice_group.addButton(b)
+            b.setCursor(Qt.CursorShape.PointingHandCursor)
+            b.setStyleSheet("""
+                QRadioButton {
+                    color:#E8E8E8;
+                    font-size:13px;
+                }
+        
+                QRadioButton:checked {
+                    color:#89B4FA;
+                    font-weight:bold;
+                }
+        
+                QRadioButton::indicator {
+                    width:14px;
+                    height:14px;
+                }
+            """)
+        
+        grid.addWidget(self.voice_jenny,0,0)
+        grid.addWidget(self.voice_ryan,0,1)
+        
+        grid.addWidget(self.voice_ava,1,0)
+        grid.addWidget(self.voice_guy,1,1)
+        
+        grid.addWidget(self.voice_aria,2,0)
+        grid.addWidget(self.voice_sonia,2,1)
+        
+        voice_layout.addLayout(grid)
+        
+        self.voice_jenny.setChecked(True)
+        
+        bottom_layout.addLayout(voice_layout,4)
+        
+        # -------- Buttons --------
+        
+        # -------- Generate Button --------
 
         self.start_button = QPushButton("🚀 Generate Video")
         self.start_button.setCursor(Qt.CursorShape.PointingHandCursor)
         self.start_button.clicked.connect(self.start_generation)
-        button_row.addWidget(self.start_button)
-
+        
+        bottom_layout.addWidget(self.start_button, 4)
+        
+        
+        # -------- Speech Button --------
+        
         self.mic_button = QPushButton("🎤")
         self.mic_button.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.mic_button.setFixedWidth(70)
+        self.mic_button.setFixedHeight(45)
+        self.mic_button.setFixedWidth(80)
         self.mic_button.setToolTip("Click and speak to fill the prompt")
+        
         self.mic_button.setStyleSheet("""
-            QPushButton { background-color: #f9e2af; color: #11111b; font-size: 22px; }
-            QPushButton:hover { background-color: #f5c97a; }
-            QPushButton:disabled { background-color: #45475a; color: #a6adc8; }
+        QPushButton{
+            background-color:#f9e2af;
+            color:#11111b;
+            font-size:22px;
+            border-radius:10px;
+        }
+        QPushButton:hover{
+            background-color:#f5c97a;
+        }
+        QPushButton:disabled{
+            background-color:#45475a;
+            color:#a6adc8;
+        }
         """)
+        
         self.mic_button.clicked.connect(self.start_listening)
-        button_row.addWidget(self.mic_button)
-
-        content_layout.addLayout(button_row)
+        
+        bottom_layout.addWidget(self.mic_button, 2)
+        
+        content_layout.addLayout(bottom_layout)
+        
 
         self.progress_bar = MovingTextProgressBar()
         self.progress_bar.setRange(0, 100)
@@ -499,7 +597,26 @@ class MainWindow(QMainWindow):
             self.worker = DemoWorker()
         else:
             self.current_eta = "~08:00"
-            self.worker = PipelineWorker(self.current_prompt)
+        
+            voice_map = {
+                self.voice_jenny: "en-US-JennyNeural",
+                self.voice_ava: "en-US-AvaNeural",
+                self.voice_aria: "en-US-AriaNeural",
+                self.voice_ryan: "en-GB-RyanNeural",
+                self.voice_guy: "en-US-GuyNeural",
+                self.voice_sonia: "en-GB-SoniaNeural",
+            }
+        
+            selected_voice = None
+            for button, voice in voice_map.items():
+                if button.isChecked():
+                    selected_voice = voice
+                    break
+        
+            self.worker = PipelineWorker(
+                self.current_prompt,
+                selected_voice
+            )
 
         self.ui_timer.start(100)
 
