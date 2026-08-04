@@ -121,12 +121,18 @@ def generate_images() -> list[dict]:
     return images
 
 
-async def generate_audio(story: dict) -> dict:
+async def generate_audio(
+    story: dict,
+    voice: str,
+) -> dict:
     """Generate one seamless audio track for the complete story."""
 
     print("\n=== Step 3: Generating scene audio ===")
 
-    audio_result = await generate_story_audio(story)
+    audio_result = await generate_story_audio(
+        story,
+        voice,
+    )
 
     print(
         "  Scene narrations generated: "
@@ -165,14 +171,20 @@ def generate_video(audio_result: dict) -> None:
 # Main pipeline
 # ---------------------------------------------------------------------------
 
-async def run_pipeline(user_prompt: str) -> None:
+async def run_pipeline(
+    user_prompt: str,
+    voice: str,
+) -> None:
     reset_api_timeline()
 
     try:
         story = generate_story_json(user_prompt)
         generate_images()
 
-        audio_result = await generate_audio(story)
+        audio_result = await generate_audio(
+            story,
+            voice,
+        )
         generate_video(audio_result)
 
     except Exception as exc:
@@ -213,11 +225,17 @@ DEFAULT_PROMPT = (
 )
 
 
-def main(user_prompt: str = DEFAULT_PROMPT) -> None:
+def main(
+    user_prompt: str = DEFAULT_PROMPT,
+    voice: str = "en-GB-RyanNeural",
+) -> None:
     """Synchronous entry point used by gui.py."""
 
     asyncio.run(
-        run_pipeline(user_prompt)
+        run_pipeline(
+            user_prompt,
+            voice,
+        )
     )
 
 
