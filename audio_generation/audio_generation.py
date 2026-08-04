@@ -25,7 +25,7 @@ FINAL_OUTPUT_DIR = AUDIO_ROOT_DIR / "final"
 FULL_STORY_AUDIO_PATH = FINAL_OUTPUT_DIR / "full_story_audio.wav"
 AUDIO_TIMELINE_PATH = FINAL_OUTPUT_DIR / "audio_timeline.json"
 
-NARRATOR_VOICE = "en-GB-RyanNeural"
+#NARRATOR_VOICE = "en-GB-RyanNeural"
 
 SCENE_BUFFER_MS = 400
 BGM_FADE_IN_MS = 700
@@ -249,7 +249,11 @@ def repeat_audio_to_length(
 # Narration generation
 # ---------------------------------------------------------------------------
 
-async def generate_scene_voice(scene: dict, scene_id: int) -> dict:
+async def generate_scene_voice(
+    scene: dict,
+    scene_id: int,
+    voice: str,
+) -> dict:
     """
     Generate narration for one scene.
 
@@ -270,7 +274,7 @@ async def generate_scene_voice(scene: dict, scene_id: int) -> dict:
 
     communicate = edge_tts.Communicate(
         text=text,
-        voice=NARRATOR_VOICE,
+        voice=voice,
         rate=style["rate"],
         pitch=style["pitch"],
         boundary="SentenceBoundary",
@@ -284,7 +288,7 @@ async def generate_scene_voice(scene: dict, scene_id: int) -> dict:
         "edge_tts_scene_narration",
         {
             "scene_id": scene_id,
-            "voice": NARRATOR_VOICE,
+            "voice": voice,
             "mood": mood,
             "rate": style["rate"],
             "pitch": style["pitch"],
@@ -351,7 +355,10 @@ async def generate_scene_voice(scene: dict, scene_id: int) -> dict:
     }
 
 
-async def generate_all_scene_voices(story: dict) -> list[dict]:
+async def generate_all_scene_voices(
+    story: dict,
+    voice: str,
+) -> list[dict]:
     """Generate all TTS narrations concurrently, with a worker limit."""
 
     scenes = story.get("scenes", [])
@@ -363,7 +370,11 @@ async def generate_all_scene_voices(story: dict) -> list[dict]:
 
     async def limited_generate(scene: dict, scene_id: int) -> dict:
         async with semaphore:
-            return await generate_scene_voice(scene, scene_id)
+            return await generate_scene_voice(
+                scene,
+                scene_id,
+                voice,
+            )
 
     tasks = [
         limited_generate(scene, scene_id)
@@ -561,11 +572,17 @@ def export_full_story_audio(
     return manifest
 
 
-async def generate_story_audio(story: dict) -> dict:
+async def generate_story_audio(
+    story: dict,
+    voice: str,
+) -> dict:
     """Main audio entry point used by main.py."""
 
     clear_audio_outputs()
-    scene_results = await generate_all_scene_voices(story)
+    scene_results = await generate_all_scene_voices(
+        story,
+        voice,
+    )
     return export_full_story_audio(scene_results)
 
 
@@ -580,8 +597,10 @@ async def main() -> None:
         raise FileNotFoundError(f"Story JSON not found: {story_path}")
 
     story = json.loads(story_path.read_text(encoding="utf-8"))
-    await generate_story_audio(story)
-
+    await generate_story_audio(
+        story,
+        "en-GB-RyanNeural",
+    )
 
 if __name__ == "__main__":
     asyncio.run(main())
