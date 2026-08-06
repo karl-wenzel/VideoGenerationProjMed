@@ -10,7 +10,8 @@ httpx==0.28.1
 idna==3.15
 jiter==0.14.0
 openai==2.37.0
-pillow==12.2.0
+# MoviePy 2.x currently requires Pillow below version 12.
+pillow>=9.2.0,<12.0
 pydantic==2.13.4
 pydantic_core==2.46.4
 python-dotenv==1.2.2
@@ -23,7 +24,7 @@ urllib3==2.7.0
 numpy
 edge_tts
 pydub
-moviepy
+moviepy>=2.0,<3.0
 PyQt6
 SpeechRecognition
 PyAudio

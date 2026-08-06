@@ -383,7 +383,7 @@ class MainWindow(QMainWindow):
         self.mic_button = QPushButton("🎤")
         self.mic_button.setCursor(Qt.CursorShape.PointingHandCursor)
         self.mic_button.setFixedHeight(45)
-        self.mic_button.setFixedWidth(80)
+        self.mic_button.setFixedWidth(110)
         self.mic_button.setToolTip("Click and speak to fill the prompt")
         
         self.mic_button.setStyleSheet("""
@@ -548,12 +548,17 @@ class MainWindow(QMainWindow):
     # 6. Speech-to-Text Logik
     # ==========================================
     def start_listening(self):
-        # Don't start a second recording while one is running.
+        # The same button stops the active recording early, as requested.
         if self.speech_worker is not None and self.speech_worker.isRunning():
+            self.speech_worker.stop_recording()
+            self.mic_button.setEnabled(False)
+            self.mic_button.setText("…")
+            self.status_label.setText("Status: Processing recorded speech...")
             return
 
-        self.mic_button.setEnabled(False)
-        self.mic_button.setText("…")
+        self.mic_button.setEnabled(True)
+        self.mic_button.setText("⏹ Stop")
+        self.mic_button.setToolTip("Stop recording and transcribe the audio recorded so far")
 
         self.speech_worker = SpeechWorker()
         self.speech_worker.listening_signal.connect(self.on_speech_listening)
@@ -578,6 +583,7 @@ class MainWindow(QMainWindow):
     def _reset_mic_button(self):
         self.mic_button.setEnabled(True)
         self.mic_button.setText("🎤")
+        self.mic_button.setToolTip("Click and speak to fill the prompt")
 
     # ==========================================
     # 7. Generator Logik
