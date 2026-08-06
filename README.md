@@ -87,8 +87,45 @@ Core dependencies:
     ACADEMIC_CLOUD_CHATAI_API_KEY=your_api_key_here
     ```
 
-3. **Add background music files** to the `bgm/` folder. One `.wav` file is needed per mood:
-   `happy`, `calm`, `warm`, `mysterious`, `adventurous`, `worried`, `sad`, `scary`
+## Git LFS Setup
+
+The background music `.wav` files in `audio_generation/bgm/` are stored with
+[Git Large File Storage (Git LFS)](https://git-lfs.com/). Install Git LFS before
+cloning the repository so Git downloads the actual audio files instead of only
+their small pointer files.
+
+1. Install Git LFS:
+
+   - Windows: `winget install GitHub.GitLFS`
+   - macOS: `brew install git-lfs`
+   - Debian/Ubuntu: `sudo apt install git-lfs`
+
+2. Enable Git LFS for your user account:
+
+   ```bash
+   git lfs install
+   ```
+
+3. Clone the repository normally:
+
+   ```bash
+   git clone <repository-url>
+   cd TextToImgProMed
+   ```
+
+If the repository was cloned before Git LFS was installed, download the audio
+files afterward with:
+
+```bash
+git lfs pull
+```
+
+You can verify that the background audio is managed by Git LFS with:
+
+```bash
+git lfs ls-files
+```
+
 
 ---
 
@@ -132,7 +169,7 @@ Each scene is narrated using the `en-GB-RyanNeural` voice via `edge-tts`. The mo
 Scene images and their corresponding audio tracks are combined in order using `moviepy`. Each scene lasts for the duration of its audio plus a 1-second pause. The final video is exported as `tmp/final_story.mp4`.
 
 ### 5. GUI
-If you want to start the GUI you have to execute the 'start_pipeline.command'. This script acts as an automated shortcut that navigates to the project folder, activates the necessary Conda environment, and launches the application. You need this code because it allows anyone to start the software with a single click, completely removing the need to manually type complex commands into the terminal.
+If you want to start the GUI you may use the 'start_pipeline.command'. This script acts as an automated shortcut that navigates to the project folder, activates the necessary Conda environment, and launches the application. You need this code because it allows anyone to start the software with a single click, completely removing the need to manually type complex commands into the terminal.
 
 ---
 
